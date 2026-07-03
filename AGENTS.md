@@ -206,3 +206,70 @@ Until changed by an approved decision record:
 - Inventory costing default: Weighted average, with item-level FIFO/LIFO support
   where configured.
 - Negative stock: Disabled by default.
+
+---
+
+## 11. Git Commit Rule
+
+Development work must be committed frequently with clear, reviewable commits.
+
+Commit when:
+
+- A coherent feature slice is complete.
+- A bug fix is complete and verified.
+- A documentation section is finalized.
+- A migration or schema change is completed with related code.
+- A risky refactor reaches a stable checkpoint.
+- Before switching to an unrelated task.
+
+Do not create oversized commits that mix unrelated concerns.
+
+Good commit scope examples:
+
+- Add RBAC permission schema.
+- Implement room status repository.
+- Add reservation availability validation.
+- Document kitchen room service workflow.
+
+Avoid vague messages:
+
+- Update files.
+- Changes.
+- Fix stuff.
+- Work in progress.
+
+Use concise imperative commit messages:
+
+```text
+type: short description
+```
+
+Recommended types:
+
+- `docs`
+- `feat`
+- `fix`
+- `refactor`
+- `test`
+- `chore`
+- `db`
+
+Examples:
+
+```text
+docs: add inventory workflow rules
+feat: add room status service
+fix: prevent checkout without active stay
+db: add reservation and stay tables
+test: cover hotel-scoped room queries
+```
+
+Before committing:
+
+- Run relevant tests or checks when available.
+- Review `git diff --staged`.
+- Ensure no secrets, full Aadhaar numbers, passwords, or API keys are staged.
+- Ensure documentation is updated when behavior or architecture changes.
+
+Commit messages should describe the business or technical outcome, not the file
+editing activity.
