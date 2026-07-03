@@ -11,7 +11,7 @@ This document tracks the functional development of the HMS (Hospitality Manageme
 - [x] Project Constitution (`AGENTS.md`)
 - [x] Architecture, Database, API, and UI/UX guidelines
 
-### [/] Phase 1: Application Foundation
+### [x] Phase 1: Application Foundation
 - [x] PHP 8.3.32 & WAMP environment setup
 - [x] Slim Framework 4 foundation setup
 - [x] Dependency injection container (PHP-DI)
@@ -20,12 +20,12 @@ This document tracks the functional development of the HMS (Hospitality Manageme
 - [x] API Healthcheck endpoint
 - [x] React + TypeScript + Vite SPA frontend skeleton
 - [x] Global Git ignores and commit structures
-- [ ] Standard API response helpers & centralized JSON error handler
-- [ ] Database-backed Token Authentication middleware
-- [ ] RBAC policy permission checks
-- [ ] Hotel scoping middleware check
-- [ ] Audit logging service implementation
-- [ ] Protected sample endpoint verifying all layers
+- [x] Standard API response helpers & centralized JSON error handler
+- [x] Database-backed Token Authentication middleware
+- [x] RBAC policy permission checks
+- [x] Hotel scoping middleware check
+- [x] Audit logging service implementation
+- [x] Protected sample endpoint verifying all layers
 
 ### [ ] Phase 2: Hotel, User, and Room Core
 - [ ] Hotel groups configuration
