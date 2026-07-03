@@ -1,5 +1,7 @@
 # HMS Documentation Index
 
+![HMS icon](icon.png)
+
 This directory contains the authoritative development documentation for HMS.
 
 Start here:

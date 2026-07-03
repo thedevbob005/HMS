@@ -1,5 +1,7 @@
 # HMS
 
+![HMS icon](docs/icon.png)
+
 Hospitality Management System (HMS)
 
 This repository contains the complete engineering documentation, architecture, and implementation blueprint for a modular Hospitality Management System targeted at small and medium hotels.
