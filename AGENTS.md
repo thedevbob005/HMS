@@ -273,3 +273,14 @@ Before committing:
 
 Commit messages should describe the business or technical outcome, not the file
 editing activity.
+
+---
+
+## 12. Progress Tracking Rule
+
+Every agent and developer must read `PROGRESS.md` at the start of any work.
+When a roadmap phase, task, or subtask is completed or in progress:
+
+1. Update `PROGRESS.md` with the current status (`[x]` for completed, `[/]` for in-progress, `[ ]` for pending).
+2. Commit changes to `PROGRESS.md` alongside the associated code changes.
+3. Keep the layout, order, and roadmap titles of `PROGRESS.md` consistent with the official development roadmap.
