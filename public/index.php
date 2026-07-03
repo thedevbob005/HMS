@@ -31,6 +31,43 @@ $errorMiddleware = $app->addErrorMiddleware(
     true                   // Log error details
 );
 
+// Centralized JSON Error Handler
+$errorMiddleware->setDefaultErrorHandler(function (
+    \Psr\Http\Message\ServerRequestInterface $request,
+    \Throwable $exception,
+    bool $displayErrorDetails,
+    bool $logErrors,
+    bool $logErrorDetails
+) use ($app) {
+    $statusCode = 500;
+    $message = 'Something went wrong. Please try again.';
+
+    if ($exception instanceof \Slim\Exception\HttpException) {
+        $statusCode = $exception->getCode();
+        $message = $exception->getMessage();
+    } elseif ($exception instanceof \PDOException) {
+        // Safe message for client
+        $message = 'Database operation failed.';
+    }
+
+    $payload = [
+        'success' => false,
+        'message' => $message,
+    ];
+
+    if ($displayErrorDetails) {
+        $payload['detail'] = $exception->getMessage();
+        $payload['trace'] = explode("\n", $exception->getTraceAsString());
+    }
+
+    $response = $app->getResponseFactory()->createResponse();
+    $response->getBody()->write((string)json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));
+    
+    return $response
+        ->withHeader('Content-Type', 'application/json')
+        ->withStatus($statusCode);
+});
+
 // Register Routes
 $routes = require dirname(__DIR__) . '/routes/api.php';
 $routes($app);
