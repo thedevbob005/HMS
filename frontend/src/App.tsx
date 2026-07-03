@@ -512,6 +512,7 @@ function App() {
       <div className="login-screen">
         <div className="glass-panel login-card">
           <div className="login-header">
+            <img src="/icon.png" alt="HMS Logo" className="login-logo-img" style={{ width: '64px', height: '64px', marginBottom: '16px' }} />
             <div className="login-logo">HMS <span className="brand-accent">Tenancy</span></div>
             <p className="login-title">Hospitality Core Administration Panel</p>
           </div>
@@ -550,7 +551,10 @@ function App() {
     <div className="app-container">
       {/* Sidebar Navigation */}
       <aside className="sidebar">
-        <div className="brand">HMS <span className="brand-accent">Core</span></div>
+        <div className="brand">
+          <img src="/icon.png" alt="HMS Logo" style={{ width: '32px', height: '32px' }} />
+          <span>HMS <span className="brand-accent">Core</span></span>
+        </div>
         <ul className="nav-links">
           <li className="nav-item">
             <button
@@ -1114,8 +1118,8 @@ function App() {
             </div>
             
             {/* Weekend */}
-            <div style={{ marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px' }}>
-              <h4 style={{ margin: '0 0 10px 0', color: '#fff' }}>Weekend Price Overrides</h4>
+            <div style={{ marginBottom: '20px', borderBottom: '1px solid rgba(0,0,0,0.08)', paddingBottom: '12px' }}>
+              <h4 style={{ margin: '0 0 10px 0', color: '#0f172a' }}>Weekend Price Overrides</h4>
               <div className="form-grid">
                 <div className="form-group">
                   <label className="form-label">Saturday Rate (INR)</label>
@@ -1141,8 +1145,8 @@ function App() {
             </div>
 
             {/* Seasonal */}
-            <div style={{ marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px' }}>
-              <h4 style={{ margin: '0 0 10px 0', color: '#fff' }}>Seasonal Rate Rule</h4>
+            <div style={{ marginBottom: '20px', borderBottom: '1px solid rgba(0,0,0,0.08)', paddingBottom: '12px' }}>
+              <h4 style={{ margin: '0 0 10px 0', color: '#0f172a' }}>Seasonal Rate Rule</h4>
               <div className="form-grid">
                 <div className="form-group">
                   <label className="form-label">Start Date</label>
@@ -1189,7 +1193,7 @@ function App() {
 
             {/* Holiday */}
             <div style={{ marginBottom: '10px' }}>
-              <h4 style={{ margin: '0 0 10px 0', color: '#fff' }}>Holiday Rate Override</h4>
+              <h4 style={{ margin: '0 0 10px 0', color: '#0f172a' }}>Holiday Rate Override</h4>
               <div className="form-grid">
                 <div className="form-group">
                   <label className="form-label">Holiday Date</label>
