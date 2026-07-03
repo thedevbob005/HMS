@@ -27,17 +27,17 @@ This document tracks the functional development of the HMS (Hospitality Manageme
 - [x] Audit logging service implementation
 - [x] Protected sample endpoint verifying all layers
 
-### [/] Phase 2: Hotel, User, and Room Core
-- [ ] Phinx database migrations for room structures
-- [ ] Hotel groups and hotels CRUD API
-- [ ] User listings, role allocation, and hotel access API
-- [ ] Room types CRUD and complex pricing rules calculation API
-- [ ] Rooms CRUD and status update with logging API
-- [ ] Vite SPA: premium login and dashboard interface
-- [ ] Vite SPA: multi-hotel context selector
-- [ ] Vite SPA: user and access configuration interface
-- [ ] Vite SPA: room type and rate rule configuration interface
-- [ ] Vite SPA: rooms status grid and manual transition controls
+### [x] Phase 2: Hotel, User, and Room Core
+- [x] Phinx database migrations for room structures
+- [x] Hotel groups and hotels CRUD API
+- [x] User listings, role allocation, and hotel access API
+- [x] Room types CRUD and complex pricing rules calculation API
+- [x] Rooms CRUD and status update with logging API
+- [x] Vite SPA: premium login and dashboard interface
+- [x] Vite SPA: multi-hotel context selector
+- [x] Vite SPA: user and access configuration interface
+- [x] Vite SPA: room type and rate rule configuration interface
+- [x] Vite SPA: rooms status grid and manual transition controls
 
 ### [ ] Phase 3: Guest, Reservation, Check-in, Checkout
 - [ ] Guest profile registration
