@@ -1,0 +1,29 @@
+# Composer dependencies
+/vendor/
+
+# Configuration and secrets
+/.env
+
+# Local logs
+/storage/logs/
+*.log
+
+# Frontend dependencies and builds
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.eslintcache
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# IDE configurations
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp

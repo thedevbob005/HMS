@@ -1,0 +1,70 @@
+# HMS Project Progress Tracker
+
+This document tracks the functional development of the HMS (Hospitality Management System) project.
+
+---
+
+## Roadmap Progress
+
+### [x] Phase 0: Documentation Foundation
+- [x] Master Development Blueprint
+- [x] Project Constitution (`AGENTS.md`)
+- [x] Architecture, Database, API, and UI/UX guidelines
+
+### [/] Phase 1: Application Foundation
+- [x] PHP 8.3.32 & WAMP environment setup
+- [x] Slim Framework 4 foundation setup
+- [x] Dependency injection container (PHP-DI)
+- [x] Base schema migrations for tenancy and auth (`Phinx`)
+- [x] Core Middleware (JSON parsing)
+- [x] API Healthcheck endpoint
+- [x] React + TypeScript + Vite SPA frontend skeleton
+- [x] Global Git ignores and commit structures
+
+### [ ] Phase 2: Hotel, User, and Room Core
+- [ ] Hotel groups configuration
+- [ ] Individual Hotel setup
+- [ ] User profiles and role-based access assignment
+- [ ] Room types and room inventory setup
+- [ ] Housekeeping status logging
+
+### [ ] Phase 3: Guest, Reservation, Check-in, Checkout
+- [ ] Guest profile registration
+- [ ] Identity document uploads (access guarded)
+- [ ] Reservation booking calendar
+- [ ] Check-in flow and advance payments
+- [ ] Checkout calculations, folios, and invoicing
+
+### [ ] Phase 4: Accounts and Messaging
+- [ ] Payment methods (Cash, Card, UPI, etc.)
+- [ ] Split payment allocations
+- [ ] GST invoice PDF generation
+- [ ] MSG91 SMS/WhatsApp notifications integration
+
+### [ ] Phase 5: Aadhaar Verification
+- [ ] Sandbox.co.in verification workflow
+- [ ] Masked Aadhaar storage logic
+- [ ] Audited manual identity capture fallback
+
+### [ ] Phase 6: Housekeeping
+- [ ] Checkout cleaning task auto-generation
+- [ ] Room service readiness validation dashboard
+- [ ] Maintenance request logging
+
+### [ ] Phase 7: Inventory and Purchase
+- [ ] Vendors registration
+- [ ] Inventory items tracking with Weighted Average costing
+- [ ] Stock batches and purchase order approvals
+
+### [ ] Phase 8: Kitchen and Recipe Costing
+- [ ] Room service kitchen orders
+- [ ] Recipe costing sheets and auto inventory deduction
+
+### [ ] Phase 9: Employees
+- [ ] Staff profile records, department routing, and shift schedules
+- [ ] Attendance tracking
+
+### [ ] Phase 10: Reporting and Release Hardening
+- [ ] Daily collection, occupancy, GST, and revenue reports
+- [ ] Progressive Web App (PWA) polish
+- [ ] System hardening and backup scripting
