@@ -6,9 +6,10 @@ This repository contains the complete engineering documentation, architecture, a
 
 ## Documentation Roadmap
 
-- `AGENTS.md` — AI & developer instructions (project constitution)
-- `docs/00-Master Development Blueprint.md` — Master engineering blueprint
-- Additional module, workflow, database, API, and standards documents will be added incrementally.
+- `AGENTS.md` - AI and developer instructions (project constitution)
+- [docs/00-Master Development Blueprint.md](docs/00-Master%20Development%20Blueprint.md) - Master engineering blueprint
+- [docs/README.md](docs/README.md) - Documentation index and reading order
+- Module, workflow, database, API, UI, security, and roadmap documents live under `docs/`.
 
 ## Technology
 
