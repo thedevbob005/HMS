@@ -57,7 +57,7 @@ function App() {
   const [loginPassword, setLoginPassword] = useState('');
 
   // App Tabs
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'hotels' | 'staff' | 'room-config' | 'rooms' | 'guests' | 'reservations' | 'stays' | 'invoices' | 'reports' | 'notifications'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'hotels' | 'staff' | 'room-config' | 'rooms' | 'guests' | 'reservations' | 'stays' | 'invoices' | 'reports' | 'notifications' | 'housekeeping'>('dashboard');
 
   // Loaded DB data
   const [hotels, setHotels] = useState<Hotel[]>([]);
@@ -136,6 +136,16 @@ function App() {
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [showFallbackModal, setShowFallbackModal] = useState(false);
   const [showLogsModal, setShowLogsModal] = useState(false);
+
+  // Phase 6 State
+  const [housekeepingTasks, setHousekeepingTasks] = useState<any[]>([]);
+  const [hkStatusFilter, setHkStatusFilter] = useState('');
+  const [hkTypeFilter, setHkTypeFilter] = useState('');
+  const [newHkRoomId, setNewHkRoomId] = useState('');
+  const [newHkType, setNewHkType] = useState('cleaning');
+  const [newHkPriority, setNewHkPriority] = useState('medium');
+  const [newHkNotes, setNewHkNotes] = useState('');
+  const [newHkAssignee, setNewHkAssignee] = useState('');
 
   // Modals state
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
@@ -277,10 +287,20 @@ function App() {
       const msgData = await msgRes.json();
       if (msgData.success) setMessages(msgData.data);
 
-      // Fetch collections report metrics
+       // Fetch collections report metrics
       const colRes = await fetch(`/api/hotels/${activeHotelId}/reports/collection?start_date=${colStartDate}&end_date=${colEndDate}`, { headers: getHeaders() });
       const colData = await colRes.json();
       if (colData.success) setCollections(colData.data);
+
+      // Fetch housekeeping tasks
+      let hkUrl = `/api/hotels/${activeHotelId}/housekeeping/tasks`;
+      const hkQuery: string[] = [];
+      if (hkStatusFilter) hkQuery.push(`status=${hkStatusFilter}`);
+      if (hkTypeFilter) hkQuery.push(`task_type=${hkTypeFilter}`);
+      if (hkQuery.length > 0) hkUrl += `?${hkQuery.join('&')}`;
+      const hkRes = await fetch(hkUrl, { headers: getHeaders() });
+      const hkData = await hkRes.json();
+      if (hkData.success) setHousekeepingTasks(hkData.data);
 
     } catch (e) {
       showFeedback('danger', 'Failed to retrieve hotel-specific metadata.');
@@ -297,7 +317,7 @@ function App() {
     if (token && activeHotelId > 0) {
       fetchScopedData();
     }
-  }, [token, activeHotelId, activeTab, guestSearch, colStartDate, colEndDate]);
+  }, [token, activeHotelId, activeTab, guestSearch, colStartDate, colEndDate, hkStatusFilter, hkTypeFilter]);
 
   const updateActiveHotel = (id: number) => {
     setActiveHotelId(id);
@@ -773,6 +793,99 @@ function App() {
     }
   };
 
+  // Phase 6 Action Handlers
+  const fetchHousekeepingTasks = async () => {
+    if (!activeHotelId) return;
+    let url = `/api/hotels/${activeHotelId}/housekeeping/tasks`;
+    const query: string[] = [];
+    if (hkStatusFilter) query.push(`status=${hkStatusFilter}`);
+    if (hkTypeFilter) query.push(`task_type=${hkTypeFilter}`);
+    if (query.length > 0) url += `?${query.join('&')}`;
+
+    try {
+      const res = await fetch(url, { headers: getHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        setHousekeepingTasks(data.data);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to retrieve housekeeping tasks.');
+    }
+  };
+
+  const handleCreateHkTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/housekeeping/tasks`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          room_id: newHkRoomId || null,
+          task_type: newHkType,
+          priority: newHkPriority,
+          assigned_to: newHkAssignee || null,
+          notes: newHkNotes
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showFeedback('success', data.message);
+        setNewHkRoomId('');
+        setNewHkNotes('');
+        setNewHkAssignee('');
+        fetchHousekeepingTasks();
+        fetchScopedData();
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to log housekeeping task.');
+    }
+  };
+
+  const handleAssignTask = async (taskId: number, assigneeId: string) => {
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/housekeeping/tasks/${taskId}/assign`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          assigned_to: assigneeId || null
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showFeedback('success', data.message);
+        fetchHousekeepingTasks();
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to assign staff.');
+    }
+  };
+
+  const handleUpdateHkStatus = async (taskId: number, status: string) => {
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/housekeeping/tasks/${taskId}/status`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          status
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showFeedback('success', data.message);
+        fetchHousekeepingTasks();
+        fetchScopedData();
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to update task status.');
+    }
+  };
+
   // Create Reservation
   const handleCreateReservation = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1156,6 +1269,16 @@ function App() {
               className={`nav-button ${activeTab === 'notifications' ? 'active' : ''}`}
             >
               Message Queue Logs
+            </button>
+          </li>
+          <li className="nav-item">
+            <button
+              onClick={() => {
+                setActiveTab('housekeeping');
+              }}
+              className={`nav-button ${activeTab === 'housekeeping' ? 'active' : ''}`}
+            >
+              Housekeeping & Readiness
             </button>
           </li>
         </ul>
@@ -2499,6 +2622,255 @@ function App() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* 12. HOUSEKEEPING & MAINTENANCE DASHBOARD */}
+          {activeTab === 'housekeeping' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 className="page-title" style={{ margin: 0 }}>Housekeeping & Room Readiness</h2>
+                <button onClick={fetchHousekeepingTasks} className="btn btn-secondary btn-sm">Refresh Dashboard</button>
+              </div>
+
+              {/* Dirty / Under-Maintenance Rooms Panel */}
+              <div className="glass-panel" style={{ marginBottom: '20px' }}>
+                <h3 className="page-title" style={{ fontSize: '18px', marginBottom: '15px' }}>Current Dirty or Maintenance Rooms</h3>
+                {rooms.filter(r => r.status === 'Cleaning' || r.status === 'Maintenance').length === 0 ? (
+                  <p style={{ color: '#9ca3af', fontStyle: 'italic', margin: 0 }}>All rooms are currently Available or Occupied. No rooms need servicing.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px' }}>
+                    {rooms.filter(r => r.status === 'Cleaning' || r.status === 'Maintenance').map(room => {
+                      // Find active task for this room if any
+                      const activeTask = housekeepingTasks.find(t => t.room_id === room.id && t.status !== 'completed' && t.status !== 'cancelled');
+                      return (
+                        <div key={room.id} style={{ 
+                          flex: '1 1 220px', 
+                          background: 'rgba(255,255,255,0.4)', 
+                          border: '1px solid rgba(0,0,0,0.05)', 
+                          borderRadius: '8px', 
+                          padding: '15px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between'
+                        }}>
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                              <strong style={{ fontSize: '16px' }}>Room {room.room_number}</strong>
+                              <span style={{ 
+                                padding: '2px 8px', 
+                                borderRadius: '12px', 
+                                fontSize: '11px', 
+                                fontWeight: 'bold', 
+                                color: '#fff',
+                                background: room.status === 'Cleaning' ? 'var(--primary)' : '#d97706' 
+                              }}>{room.status}</span>
+                            </div>
+                            <p style={{ fontSize: '13px', margin: '0 0 10px 0', color: '#e2e8f0' }}>
+                              Type: {roomTypes.find(t => t.id === room.room_type_id)?.name || 'N/A'}
+                            </p>
+                            {activeTask ? (
+                              <div style={{ fontSize: '12px', background: 'rgba(0,0,0,0.1)', padding: '8px', borderRadius: '4px', marginBottom: '10px' }}>
+                                <div style={{ marginBottom: '4px' }}><strong>Task Type:</strong> <span style={{ textTransform: 'capitalize' }}>{activeTask.task_type}</span></div>
+                                <div style={{ marginBottom: '4px' }}><strong>Status:</strong> <span style={{ textTransform: 'capitalize' }}>{activeTask.status}</span></div>
+                                <div><strong>Assignee:</strong> {activeTask.assignee_name || 'Unassigned'}</div>
+                              </div>
+                            ) : (
+                              <p style={{ fontSize: '12px', color: '#9ca3af', fontStyle: 'italic', margin: '0 0 10px 0' }}>No active cleaning/maintenance task found.</p>
+                            )}
+                          </div>
+                          
+                          {activeTask ? (
+                            <button 
+                              onClick={() => handleUpdateHkStatus(activeTask.id, 'completed')} 
+                              className="btn btn-sm" 
+                              style={{ width: '100%', padding: '6px', fontSize: '12px', background: 'var(--status-available)', color: '#fff' }}
+                            >
+                              Release & Mark Ready
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => {
+                                setNewHkRoomId(String(room.id));
+                                setNewHkType(room.status === 'Cleaning' ? 'cleaning' : 'maintenance');
+                                setNewHkPriority(room.status === 'Cleaning' ? 'medium' : 'high');
+                                setNewHkNotes('Quick start task to release room');
+                              }} 
+                              className="btn btn-secondary btn-sm" 
+                              style={{ width: '100%', padding: '6px', fontSize: '12px' }}
+                            >
+                              Create Task
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '20px', alignItems: 'start' }}>
+                
+                {/* Tasks List */}
+                <div className="glass-panel">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <h3 className="page-title" style={{ fontSize: '18px', margin: 0 }}>All Housekeeping & Maintenance Tasks</h3>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <select className="select-dropdown" style={{ padding: '4px 8px', fontSize: '12px' }} value={hkTypeFilter} onChange={(e) => setHkTypeFilter(e.target.value)}>
+                        <option value="">All Types</option>
+                        <option value="cleaning">Cleaning</option>
+                        <option value="maintenance">Maintenance</option>
+                        <option value="laundry">Laundry</option>
+                      </select>
+                      <select className="select-dropdown" style={{ padding: '4px 8px', fontSize: '12px' }} value={hkStatusFilter} onChange={(e) => setHkStatusFilter(e.target.value)}>
+                        <option value="">All Statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="table-wrapper">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Room</th>
+                          <th>Type</th>
+                          <th>Priority</th>
+                          <th>Status</th>
+                          <th>Assignee / Staff</th>
+                          <th>Notes</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {housekeepingTasks.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>No tasks match filters.</td>
+                          </tr>
+                        ) : (
+                          housekeepingTasks.map(task => (
+                            <tr key={task.id}>
+                              <td><strong>{task.room_number ? `Room ${task.room_number}` : 'Facility'}</strong></td>
+                              <td><span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#a78bfa', fontWeight: '600' }}>{task.task_type}</span></td>
+                              <td>
+                                <span style={{ 
+                                  fontSize: '11px', 
+                                  color: task.priority === 'high' ? 'var(--status-occupied)' : task.priority === 'medium' ? '#d97706' : '#9ca3af', 
+                                  fontWeight: 'bold', 
+                                  textTransform: 'uppercase' 
+                                }}>{task.priority}</span>
+                              </td>
+                              <td>
+                                <span className="room-status-badge" style={{ 
+                                  margin: 0, 
+                                  background: task.status === 'completed' ? 'var(--status-available)' :
+                                              task.status === 'in_progress' ? 'var(--primary)' :
+                                              task.status === 'cancelled' ? '#9ca3af' : '#d97706' 
+                                }}>
+                                  {task.status === 'in_progress' ? 'In Progress' : task.status}
+                                </span>
+                              </td>
+                              <td>
+                                {task.status !== 'completed' && task.status !== 'cancelled' ? (
+                                  <select 
+                                    value={task.assigned_to || ''} 
+                                    onChange={(e) => handleAssignTask(task.id, e.target.value)}
+                                    className="select-dropdown"
+                                    style={{ padding: '4px', fontSize: '12px', background: 'rgba(255,255,255,0.1)', color: '#fff' }}
+                                  >
+                                    <option value="" style={{ color: '#000' }}>Unassigned</option>
+                                    {users.map(u => (
+                                      <option key={u.id} value={u.id} style={{ color: '#000' }}>{u.username}</option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <span>{task.assignee_name || 'N/A'}</span>
+                                )}
+                              </td>
+                              <td style={{ fontSize: '12px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.notes || '-'}</td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '5px' }}>
+                                  {task.status === 'pending' && (
+                                    <button onClick={() => handleUpdateHkStatus(task.id, 'in_progress')} className="btn btn-sm btn-secondary" style={{ padding: '3px 6px', fontSize: '11px' }}>Start</button>
+                                  )}
+                                  {task.status === 'in_progress' && (
+                                    <button onClick={() => handleUpdateHkStatus(task.id, 'completed')} className="btn btn-sm" style={{ padding: '3px 6px', fontSize: '11px', background: 'var(--status-available)', color: '#fff' }}>Complete</button>
+                                  )}
+                                  {task.status !== 'completed' && task.status !== 'cancelled' && (
+                                    <button onClick={() => handleUpdateHkStatus(task.id, 'cancelled')} className="btn btn-sm btn-secondary" style={{ padding: '3px 6px', fontSize: '11px', color: 'var(--status-occupied)' }}>Cancel</button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Form to Log New Housekeeping Task */}
+                <div className="glass-panel">
+                  <h3 className="page-title" style={{ fontSize: '18px', marginBottom: '15px' }}>Report Issue / Create Task</h3>
+                  <form onSubmit={handleCreateHkTask}>
+                    <div className="form-group" style={{ marginBottom: '12px' }}>
+                      <label className="form-label">Linked Room</label>
+                      <select className="select-dropdown" value={newHkRoomId} onChange={(e) => setNewHkRoomId(e.target.value)}>
+                        <option value="">General Facility (None)</option>
+                        {rooms.map(r => (
+                          <option key={r.id} value={r.id}>Room {r.room_number} ({r.status})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: '12px' }}>
+                      <label className="form-label">Task Type</label>
+                      <select className="select-dropdown" value={newHkType} onChange={(e) => setNewHkType(e.target.value)}>
+                        <option value="cleaning">Room Cleaning</option>
+                        <option value="maintenance">Maintenance Repair</option>
+                        <option value="laundry">Laundry Service</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: '12px' }}>
+                      <label className="form-label">Priority</label>
+                      <select className="select-dropdown" value={newHkPriority} onChange={(e) => setNewHkPriority(e.target.value)}>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High (Urgent)</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: '12px' }}>
+                      <label className="form-label">Assign Worker</label>
+                      <select className="select-dropdown" value={newHkAssignee} onChange={(e) => setNewHkAssignee(e.target.value)}>
+                        <option value="">Unassigned</option>
+                        {users.map(u => (
+                          <option key={u.id} value={u.id}> {u.username} </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: '15px' }}>
+                      <label className="form-label">Task Details / Operator Notes</label>
+                      <textarea 
+                        className="form-input" 
+                        rows={3} 
+                        placeholder="Describe cleaning instructions or maintenance request..." 
+                        value={newHkNotes}
+                        onChange={(e) => setNewHkNotes(e.target.value)}
+                        required
+                      />
+                    </div>
+
+                    <button type="submit" className="btn" style={{ width: '100%' }}>Create Task</button>
+                  </form>
+                </div>
+
               </div>
             </div>
           )}

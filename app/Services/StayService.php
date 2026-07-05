@@ -9,6 +9,7 @@ use App\Repositories\RoomRepository;
 use App\Repositories\ReservationRepository;
 use App\Services\RoomService;
 use App\Services\AuditLogService;
+use App\Services\HousekeepingService;
 use App\Validators\StayValidator;
 use PDO;
 use Exception;
@@ -22,6 +23,7 @@ class StayService
     private AuditLogService $auditLogService;
     private InvoiceService $invoiceService;
     private MessagingService $messagingService;
+    private HousekeepingService $housekeepingService;
     private PDO $pdo;
 
     public function __construct(
@@ -32,6 +34,7 @@ class StayService
         AuditLogService $auditLogService,
         InvoiceService $invoiceService,
         MessagingService $messagingService,
+        HousekeepingService $housekeepingService,
         PDO $pdo
     ) {
         $this->stayRepository = $stayRepository;
@@ -41,6 +44,7 @@ class StayService
         $this->auditLogService = $auditLogService;
         $this->invoiceService = $invoiceService;
         $this->messagingService = $messagingService;
+        $this->housekeepingService = $housekeepingService;
         $this->pdo = $pdo;
     }
 
@@ -360,8 +364,17 @@ class StayService
             // 4. Update room statuses
             // Old room moves to Cleaning (or custom requested)
             $oldRoomNextStatus = $data['old_room_status'] ?? 'Cleaning';
-            $this->roomRepository->updateRoomStatus($oldRoomId, $oldRoomNextStatus);
-            $this->roomRepository->logStatusChange($oldRoomId, 'Occupied', $oldRoomNextStatus, 'Room Shift Out', $userId);
+            if ($oldRoomNextStatus === 'Cleaning' || $oldRoomNextStatus === 'Maintenance') {
+                $this->housekeepingService->createTask($hotelId, [
+                    'room_id' => $oldRoomId,
+                    'task_type' => strtolower($oldRoomNextStatus),
+                    'priority' => $oldRoomNextStatus === 'Maintenance' ? 'high' : 'medium',
+                    'notes' => sprintf('Room Shift Out auto-generated %s task. Reason: %s', strtolower($oldRoomNextStatus), $reason)
+                ], $userId);
+            } else {
+                $this->roomRepository->updateRoomStatus($oldRoomId, $oldRoomNextStatus);
+                $this->roomRepository->logStatusChange($oldRoomId, 'Occupied', $oldRoomNextStatus, 'Room Shift Out', $userId);
+            }
 
             // New room moves to Occupied
             $this->roomRepository->updateRoomStatus($newRoomId, 'Occupied');
@@ -560,8 +573,12 @@ class StayService
                     $this->stayRepository->updateStayRoomCheckout((int)$sRoom['id'], $nowStr);
                     
                     $roomId = (int)$sRoom['room_id'];
-                    $this->roomRepository->updateRoomStatus($roomId, 'Cleaning');
-                    $this->roomRepository->logStatusChange($roomId, 'Occupied', 'Cleaning', 'Stay Checkout Completion', $userId);
+                    $this->housekeepingService->createTask($hotelId, [
+                        'room_id' => $roomId,
+                        'task_type' => 'cleaning',
+                        'priority' => 'medium',
+                        'notes' => 'Checkout auto-generated cleaning task for Stay #' . $stayId
+                    ], $userId);
                 }
             }
 

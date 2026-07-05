@@ -17,6 +17,7 @@ use App\Controllers\StayController;
 use App\Controllers\InvoiceController;
 use App\Controllers\ReportController;
 use App\Controllers\AadhaarVerificationController;
+use App\Controllers\HousekeepingController;
 
 return function (App $app) {
     // Health Check Endpoint
@@ -96,6 +97,12 @@ return function (App $app) {
 
         // Message Queue / Logs
         $group->get('/message-queue', InvoiceController::class . ':listMessages');
+
+        // Housekeeping & Maintenance
+        $group->get('/housekeeping/tasks', HousekeepingController::class . ':listTasks');
+        $group->post('/housekeeping/tasks', HousekeepingController::class . ':createTask');
+        $group->post('/housekeeping/tasks/{taskId}/assign', HousekeepingController::class . ':assignTask');
+        $group->post('/housekeeping/tasks/{taskId}/status', HousekeepingController::class . ':updateStatus');
     })
     ->add(HotelScopingMiddleware::class)
     ->add(AuthenticationMiddleware::class);

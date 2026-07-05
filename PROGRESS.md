@@ -88,10 +88,15 @@ This document tracks the functional development of the HMS (Hospitality Manageme
   - [x] Manual fallback reason form panel
   - [x] identity verification audit logs table widget
 
-### [ ] Phase 6: Housekeeping
-- [ ] Checkout cleaning task auto-generation
-- [ ] Room service readiness validation dashboard
-- [ ] Maintenance request logging
+### [x] Phase 6: Housekeeping
+- [x] Database Schema & Migrations: create `housekeeping_tasks` table to track cleaning, laundry, and maintenance logs
+- [x] Business Services: implement `HousekeepingService.php` to handle task creation, staff assignment, and status lifecycle updates
+- [x] Checkout Integration: hook task creator inside `StayService->performCheckout` and room shifts to auto-trigger room cleaning tasks
+- [x] Controller & Routes: endpoints to list tasks, add manual maintenance requests, assign workers, and transition room readiness
+- [x] Frontend React UI tab:
+  - [x] Room readiness validation dashboard showing dirty/cleaning/maintenance rooms list
+  - [x] Staff assignment dropdowns and status toggle controls
+  - [x] Custom maintenance log report form panel
 
 ### [ ] Phase 7: Inventory and Purchase
 - [ ] Vendors registration
