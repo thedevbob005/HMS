@@ -98,10 +98,18 @@ This document tracks the functional development of the HMS (Hospitality Manageme
   - [x] Staff assignment dropdowns and status toggle controls
   - [x] Custom maintenance log report form panel
 
-### [ ] Phase 7: Inventory and Purchase
-- [ ] Vendors registration
-- [ ] Inventory items tracking with Weighted Average costing
-- [ ] Stock batches and purchase order approvals
+### [x] Phase 7: Inventory and Purchase
+- [x] Database Schema & Migrations: create tables for `vendors`, `inventory_items`, `purchase_orders`, `purchase_order_items`, `goods_receipts`, `goods_receipt_items`, `stock_batches`, and `stock_ledger`
+- [x] Business Services:
+  - [x] Implement `InventoryService.php` to handle vendor registration, inventory item creation, and stock adjustments
+  - [x] Implement `PurchaseService.php` to handle PO creation, PO approval lifecycle, GRN logging, and stock ledger inserts
+  - [x] Weighted Average Costing logic: calculate new average unit costs dynamically when new stock is received or adjusted
+- [x] Controller & Routing Layer: endpoints for vendors, inventory items, stock adjustments, purchase orders, approvals, and goods receipts
+- [x] Frontend React UI tabs inside main panel:
+  - [x] Stock Inventory grid with Valuation calculations and minimum stock alert badges
+  - [x] Vendor registration directory
+  - [x] Purchase orders planner with item additions and manager approval toggles
+  - [x] Goods Receipt logger linked to approved POs with batch/expiry capture fields
 
 ### [ ] Phase 8: Kitchen and Recipe Costing
 - [ ] Room service kitchen orders

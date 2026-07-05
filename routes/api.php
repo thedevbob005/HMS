@@ -18,6 +18,8 @@ use App\Controllers\InvoiceController;
 use App\Controllers\ReportController;
 use App\Controllers\AadhaarVerificationController;
 use App\Controllers\HousekeepingController;
+use App\Controllers\InventoryController;
+use App\Controllers\PurchaseController;
 
 return function (App $app) {
     // Health Check Endpoint
@@ -103,6 +105,23 @@ return function (App $app) {
         $group->post('/housekeeping/tasks', HousekeepingController::class . ':createTask');
         $group->post('/housekeeping/tasks/{taskId}/assign', HousekeepingController::class . ':assignTask');
         $group->post('/housekeeping/tasks/{taskId}/status', HousekeepingController::class . ':updateStatus');
+
+        // Inventory
+        $group->get('/inventory/items', InventoryController::class . ':listItems');
+        $group->post('/inventory/items', InventoryController::class . ':createItem');
+        $group->post('/inventory/items/{itemId}/adjust', InventoryController::class . ':adjustStock');
+        $group->get('/inventory/vendors', InventoryController::class . ':listVendors');
+        $group->post('/inventory/vendors', InventoryController::class . ':createVendor');
+        $group->get('/inventory/items/{itemId}/ledger', InventoryController::class . ':getLedger');
+
+        // Purchases
+        $group->get('/purchases/orders', PurchaseController::class . ':listOrders');
+        $group->post('/purchases/orders', PurchaseController::class . ':createOrder');
+        $group->get('/purchases/orders/{poId}', PurchaseController::class . ':getOrder');
+        $group->post('/purchases/orders/{poId}/approve', PurchaseController::class . ':approveOrder');
+        $group->post('/purchases/orders/{poId}/receive', PurchaseController::class . ':receiveOrder');
+        $group->get('/purchases/receipts', PurchaseController::class . ':listReceipts');
+        $group->get('/purchases/receipts/{grnId}', PurchaseController::class . ':getReceipt');
     })
     ->add(HotelScopingMiddleware::class)
     ->add(AuthenticationMiddleware::class);

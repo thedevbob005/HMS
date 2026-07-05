@@ -57,7 +57,7 @@ function App() {
   const [loginPassword, setLoginPassword] = useState('');
 
   // App Tabs
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'hotels' | 'staff' | 'room-config' | 'rooms' | 'guests' | 'reservations' | 'stays' | 'invoices' | 'reports' | 'notifications' | 'housekeeping'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'hotels' | 'staff' | 'room-config' | 'rooms' | 'guests' | 'reservations' | 'stays' | 'invoices' | 'reports' | 'notifications' | 'housekeeping' | 'inventory'>('dashboard');
 
   // Loaded DB data
   const [hotels, setHotels] = useState<Hotel[]>([]);
@@ -146,6 +146,42 @@ function App() {
   const [newHkPriority, setNewHkPriority] = useState('medium');
   const [newHkNotes, setNewHkNotes] = useState('');
   const [newHkAssignee, setNewHkAssignee] = useState('');
+
+  // Phase 7 State
+  const [inventoryItems, setInventoryItems] = useState<any[]>([]);
+  const [vendors, setVendors] = useState<any[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
+  const [goodsReceipts, setGoodsReceipts] = useState<any[]>([]);
+  const [selectedHkItem, setSelectedHkItem] = useState<any | null>(null);
+  const [itemLedger, setItemLedger] = useState<any[]>([]);
+  const [showLedgerModal, setShowLedgerModal] = useState(false);
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [adjustQty, setAdjustQty] = useState('');
+  const [adjustCost, setAdjustCost] = useState('');
+  const [adjustReason, setAdjustReason] = useState('');
+  const [showCreateItemModal, setShowCreateItemModal] = useState(false);
+  const [showCreateVendorModal, setShowCreateVendorModal] = useState(false);
+  const [showCreatePoModal, setShowCreatePoModal] = useState(false);
+  const [showGrnModal, setShowGrnModal] = useState(false);
+  const [selectedPo, setSelectedPo] = useState<any | null>(null);
+  const [grnItems, setGrnItems] = useState<any[]>([]);
+  const [grnNotes, setGrnNotes] = useState('');
+  const [receivedDate, setReceivedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newItemSku, setNewItemSku] = useState('');
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemCategory, setNewItemCategory] = useState('');
+  const [newItemUom, setNewItemUom] = useState('Pcs');
+  const [newItemMinStock, setNewItemMinStock] = useState('0');
+  const [newVendorName, setNewVendorName] = useState('');
+  const [newVendorContact, setNewVendorContact] = useState('');
+  const [newVendorPhone, setNewVendorPhone] = useState('');
+  const [newVendorEmail, setNewVendorEmail] = useState('');
+  const [newVendorAddress, setNewVendorAddress] = useState('');
+  const [newVendorGst, setNewVendorGst] = useState('');
+  const [newPoVendorId, setNewPoVendorId] = useState('');
+  const [newPoNotes, setNewPoNotes] = useState('');
+  const [newPoItems, setNewPoItems] = useState<{ inventory_item_id: string, quantity: string, unit_price: string }[]>([{ inventory_item_id: '', quantity: '', unit_price: '' }]);
+  const [invSubTab, setInvSubTab] = useState<'stock' | 'vendors' | 'po' | 'grn'>('stock');
 
   // Modals state
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
@@ -301,6 +337,23 @@ function App() {
       const hkRes = await fetch(hkUrl, { headers: getHeaders() });
       const hkData = await hkRes.json();
       if (hkData.success) setHousekeepingTasks(hkData.data);
+
+      // Fetch inventory details
+      const itemRes = await fetch(`/api/hotels/${activeHotelId}/inventory/items`, { headers: getHeaders() });
+      const itemData = await itemRes.json();
+      if (itemData.success) setInventoryItems(itemData.data);
+
+      const vendRes = await fetch(`/api/hotels/${activeHotelId}/inventory/vendors`, { headers: getHeaders() });
+      const vendData = await vendRes.json();
+      if (vendData.success) setVendors(vendData.data);
+
+      const poRes = await fetch(`/api/hotels/${activeHotelId}/purchases/orders`, { headers: getHeaders() });
+      const poData = await poRes.json();
+      if (poData.success) setPurchaseOrders(poData.data);
+
+      const grnRes = await fetch(`/api/hotels/${activeHotelId}/purchases/receipts`, { headers: getHeaders() });
+      const grnData = await grnRes.json();
+      if (grnData.success) setGoodsReceipts(grnData.data);
 
     } catch (e) {
       showFeedback('danger', 'Failed to retrieve hotel-specific metadata.');
@@ -886,6 +939,208 @@ function App() {
     }
   };
 
+  // Phase 7 Action Handlers
+  const handleCreateInventoryItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/inventory/items`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          sku: newItemSku,
+          name: newItemName,
+          category: newItemCategory,
+          unit_of_measure: newItemUom,
+          min_stock_level: parseFloat(newItemMinStock)
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showFeedback('success', data.message);
+        setNewItemSku('');
+        setNewItemName('');
+        setNewItemCategory('');
+        setNewItemMinStock('0');
+        setShowCreateItemModal(false);
+        fetchScopedData();
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to register item.');
+    }
+  };
+
+  const handleCreateVendor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/inventory/vendors`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          name: newVendorName,
+          contact_name: newVendorContact,
+          phone: newVendorPhone,
+          email: newVendorEmail,
+          address: newVendorAddress,
+          gst_number: newVendorGst
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showFeedback('success', data.message);
+        setNewVendorName('');
+        setNewVendorContact('');
+        setNewVendorPhone('');
+        setNewVendorEmail('');
+        setNewVendorAddress('');
+        setNewVendorGst('');
+        setShowCreateVendorModal(false);
+        fetchScopedData();
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to register vendor.');
+    }
+  };
+
+  const handleCreatePoSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/purchases/orders`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          vendor_id: newPoVendorId,
+          notes: newPoNotes,
+          items: newPoItems
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showFeedback('success', data.message);
+        setNewPoVendorId('');
+        setNewPoNotes('');
+        setNewPoItems([{ inventory_item_id: '', quantity: '', unit_price: '' }]);
+        setShowCreatePoModal(false);
+        fetchScopedData();
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to generate PO.');
+    }
+  };
+
+  const handleApprovePo = async (poId: number, status: 'Approved' | 'Rejected') => {
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/purchases/orders/${poId}/approve`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ status })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showFeedback('success', data.message);
+        fetchScopedData();
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to update PO status.');
+    }
+  };
+
+  const handleFetchItemLedger = async (item: any) => {
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/inventory/items/${item.id}/ledger`, {
+        headers: getHeaders()
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSelectedHkItem(item);
+        setItemLedger(data.data);
+        setShowLedgerModal(true);
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to load ledger.');
+    }
+  };
+
+  const handleAdjustStockSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedHkItem) return;
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/inventory/items/${selectedHkItem.id}/adjust`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          quantity: parseFloat(adjustQty),
+          unit_cost: parseFloat(adjustCost || '0'),
+          reason: adjustReason
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showFeedback('success', data.message);
+        setAdjustQty('');
+        setAdjustCost('');
+        setAdjustReason('');
+        setShowAdjustModal(false);
+        fetchScopedData();
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to adjust stock.');
+    }
+  };
+
+  const handleOpenGrnModal = (po: any) => {
+    setSelectedPo(po);
+    // Initialize received values to PO targets for convenience
+    const items = po.items.map((item: any) => ({
+      inventory_item_id: item.inventory_item_id,
+      item_name: item.item_name,
+      quantity: item.quantity,
+      unit_cost: item.unit_price,
+      batch_number: '',
+      expiry_date: ''
+    }));
+    setGrnItems(items);
+    setGrnNotes('');
+    setShowGrnModal(true);
+  };
+
+  const handleGrnSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPo) return;
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/purchases/orders/${selectedPo.id}/receive`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          notes: grnNotes,
+          items: grnItems
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showFeedback('success', data.message);
+        setShowGrnModal(false);
+        setSelectedPo(null);
+        fetchScopedData();
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to log Goods Receipt.');
+    }
+  };
+
   // Create Reservation
   const handleCreateReservation = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1279,6 +1534,16 @@ function App() {
               className={`nav-button ${activeTab === 'housekeeping' ? 'active' : ''}`}
             >
               Housekeeping & Readiness
+            </button>
+          </li>
+          <li className="nav-item">
+            <button
+              onClick={() => {
+                setActiveTab('inventory');
+              }}
+              className={`nav-button ${activeTab === 'inventory' ? 'active' : ''}`}
+            >
+              Inventory & Purchases
             </button>
           </li>
         </ul>
@@ -2874,6 +3139,236 @@ function App() {
               </div>
             </div>
           )}
+
+          {/* 13. INVENTORY & PURCHASES DASHBOARD */}
+          {activeTab === 'inventory' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 className="page-title" style={{ margin: 0 }}>Inventory, Stock Costing, & POs</h2>
+                
+                {/* Nested Sub-tab controls */}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={() => setInvSubTab('stock')} className={`btn ${invSubTab === 'stock' ? '' : 'btn-secondary'}`} style={{ fontSize: '13px', padding: '6px 12px' }}>Stock Ledger</button>
+                  <button onClick={() => setInvSubTab('vendors')} className={`btn ${invSubTab === 'vendors' ? '' : 'btn-secondary'}`} style={{ fontSize: '13px', padding: '6px 12px' }}>Vendors</button>
+                  <button onClick={() => setInvSubTab('po')} className={`btn ${invSubTab === 'po' ? '' : 'btn-secondary'}`} style={{ fontSize: '13px', padding: '6px 12px' }}>Purchase Orders</button>
+                  <button onClick={() => setInvSubTab('grn')} className={`btn ${invSubTab === 'grn' ? '' : 'btn-secondary'}`} style={{ fontSize: '13px', padding: '6px 12px' }}>Goods Receipts (GRN)</button>
+                </div>
+              </div>
+
+              {/* SECTION A: STOCK INVENTORY */}
+              {invSubTab === 'stock' && (
+                <div className="glass-panel">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <h3 style={{ margin: 0, fontSize: '18px' }}>Valuation Directory (Weighted Average Costing)</h3>
+                    <button onClick={() => setShowCreateItemModal(true)} className="btn btn-sm">Add Stock Item</button>
+                  </div>
+                  <div className="table-wrapper">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>SKU / Code</th>
+                          <th>Item Name</th>
+                          <th>Category</th>
+                          <th>UOM</th>
+                          <th>Min Level</th>
+                          <th>Current Stock</th>
+                          <th>Weighted Avg Cost</th>
+                          <th>Valuation</th>
+                          <th>Alerts</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {inventoryItems.length === 0 ? (
+                          <tr>
+                            <td colSpan={10} style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>No inventory items registered.</td>
+                          </tr>
+                        ) : (
+                          inventoryItems.map(item => {
+                            const isLow = parseFloat(item.current_stock) < parseFloat(item.min_stock_level);
+                            const totalValuation = parseFloat(item.current_stock) * parseFloat(item.average_unit_cost);
+                            return (
+                              <tr key={item.id}>
+                                <td><code>{item.sku}</code></td>
+                                <td><strong>{item.name}</strong></td>
+                                <td>{item.category || '-'}</td>
+                                <td>{item.unit_of_measure}</td>
+                                <td>{parseFloat(item.min_stock_level).toFixed(2)}</td>
+                                <td><strong>{parseFloat(item.current_stock).toFixed(2)}</strong></td>
+                                <td>{parseFloat(item.average_unit_cost).toFixed(2)} INR</td>
+                                <td><strong>{totalValuation.toFixed(2)} INR</strong></td>
+                                <td>
+                                  {isLow ? (
+                                    <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '11px', background: 'var(--status-occupied)', color: '#fff', fontWeight: 'bold' }}>Low Stock</span>
+                                  ) : (
+                                    <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '11px', background: 'var(--status-available)', color: '#fff', fontWeight: 'bold' }}>Healthy</span>
+                                  )}
+                                </td>
+                                <td>
+                                  <div style={{ display: 'flex', gap: '5px' }}>
+                                    <button onClick={() => {
+                                      setSelectedHkItem(item);
+                                      setAdjustQty('');
+                                      setAdjustCost(parseFloat(item.average_unit_cost) > 0 ? String(item.average_unit_cost) : '');
+                                      setAdjustReason('');
+                                      setShowAdjustModal(true);
+                                    }} className="btn btn-secondary btn-sm" style={{ padding: '4px 8px', fontSize: '11px' }}>Adjust</button>
+                                    <button onClick={() => handleFetchItemLedger(item)} className="btn btn-secondary btn-sm" style={{ padding: '4px 8px', fontSize: '11px' }}>Audit Logs</button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION B: VENDORS REGISTRY */}
+              {invSubTab === 'vendors' && (
+                <div className="glass-panel">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <h3 style={{ margin: 0, fontSize: '18px' }}>Active Vendors Log</h3>
+                    <button onClick={() => setShowCreateVendorModal(true)} className="btn btn-sm">Add Vendor</button>
+                  </div>
+                  <div className="table-wrapper">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Vendor Name</th>
+                          <th>Contact Name</th>
+                          <th>Phone</th>
+                          <th>Email</th>
+                          <th>Address</th>
+                          <th>GSTIN</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {vendors.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>No vendors registered.</td>
+                          </tr>
+                        ) : (
+                          vendors.map(v => (
+                            <tr key={v.id}>
+                              <td><strong>{v.name}</strong></td>
+                              <td>{v.contact_name || '-'}</td>
+                              <td>{v.phone || '-'}</td>
+                              <td>{v.email || '-'}</td>
+                              <td style={{ fontSize: '12px' }}>{v.address || '-'}</td>
+                              <td><code>{v.gst_number || '-'}</code></td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION C: PURCHASE ORDERS */}
+              {invSubTab === 'po' && (
+                <div className="glass-panel">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <h3 style={{ margin: 0, fontSize: '18px' }}>Purchase Order Planner & Approvals</h3>
+                    <button onClick={() => setShowCreatePoModal(true)} className="btn btn-sm">Create PO</button>
+                  </div>
+                  <div className="table-wrapper">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>PO Number</th>
+                          <th>Vendor</th>
+                          <th>Total Amount</th>
+                          <th>Status</th>
+                          <th>Created By</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {purchaseOrders.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>No purchase orders found.</td>
+                          </tr>
+                        ) : (
+                          purchaseOrders.map(po => (
+                            <tr key={po.id}>
+                              <td><code>{po.po_number}</code></td>
+                              <td><strong>{po.vendor_name}</strong></td>
+                              <td>{parseFloat(po.total_amount).toFixed(2)} INR</td>
+                              <td>
+                                <span className="room-status-badge" style={{ 
+                                  margin: 0, 
+                                  background: po.status === 'Approved' ? 'var(--status-available)' :
+                                              po.status === 'Received' ? 'var(--primary)' :
+                                              po.status === 'Rejected' ? 'var(--status-occupied)' : '#d97706' 
+                                }}>
+                                  {po.status}
+                                </span>
+                              </td>
+                              <td>{po.creator_name}</td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '5px' }}>
+                                  {po.status === 'Pending Approval' && (
+                                    <>
+                                      <button onClick={() => handleApprovePo(po.id, 'Approved')} className="btn btn-sm" style={{ padding: '4px 8px', fontSize: '11px', background: 'var(--status-available)', color: '#fff' }}>Approve</button>
+                                      <button onClick={() => handleApprovePo(po.id, 'Rejected')} className="btn btn-secondary btn-sm" style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--status-occupied)' }}>Reject</button>
+                                    </>
+                                  )}
+                                  {po.status === 'Approved' && (
+                                    <button onClick={() => handleOpenGrnModal(po)} className="btn btn-sm" style={{ padding: '4px 8px', fontSize: '11px', background: 'var(--primary)', color: '#fff' }}>Receive Items (GRN)</button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION D: GOODS RECEIPTS (GRN) */}
+              {invSubTab === 'grn' && (
+                <div className="glass-panel">
+                  <h3 style={{ marginBottom: '15px', fontSize: '18px' }}>Goods Receipt Notes (GRN) History</h3>
+                  <div className="table-wrapper">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>GRN Number</th>
+                          <th>PO Link</th>
+                          <th>Received Date</th>
+                          <th>Received By</th>
+                          <th>Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {goodsReceipts.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>No goods receipt notes logged.</td>
+                          </tr>
+                        ) : (
+                          goodsReceipts.map(grn => (
+                            <tr key={grn.id}>
+                              <td><code>{grn.grn_number}</code></td>
+                              <td><code>{grn.po_number || 'Direct'}</code></td>
+                              <td>{new Date(grn.received_date).toLocaleDateString()}</td>
+                              <td>{grn.creator_name}</td>
+                              <td style={{ fontSize: '12px' }}>{grn.notes || '-'}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </main>
 
@@ -3116,6 +3611,499 @@ function App() {
                 setVerifLogs([]);
               }} className="btn btn-secondary">Close</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 8: INVENTORY STOCK ADJUSTMENT */}
+      {showAdjustModal && selectedHkItem && (
+        <div className="modal-overlay">
+          <div className="glass-panel modal-card" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Manual Stock Adjustment - {selectedHkItem.name}</h3>
+              <button onClick={() => {
+                setShowAdjustModal(false);
+                setSelectedHkItem(null);
+              }} className="modal-close">×</button>
+            </div>
+            <form onSubmit={handleAdjustStockSubmit}>
+              <div style={{ marginBottom: '15px', fontSize: '14px', color: '#e2e8f0' }}>
+                <p>Current stock balance is <strong>{parseFloat(selectedHkItem.current_stock).toFixed(2)} {selectedHkItem.unit_of_measure}</strong> with average unit cost <strong>{parseFloat(selectedHkItem.average_unit_cost).toFixed(2)} INR</strong>.</p>
+              </div>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label">Quantity Adjustment (use negative for deductions)</label>
+                <input
+                  type="number"
+                  step="0.0001"
+                  className="form-input"
+                  placeholder="e.g. 10.00 or -5.00"
+                  value={adjustQty}
+                  onChange={(e) => setAdjustQty(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label">Unit Cost (applicable for positive adjustments)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="form-input"
+                  placeholder="Unit cost in INR"
+                  value={adjustCost}
+                  onChange={(e) => setAdjustCost(e.target.value)}
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: '15px' }}>
+                <label className="form-label">Adjustment Reason / Notes</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Damage deduction or manual count correction"
+                  value={adjustReason}
+                  onChange={(e) => setAdjustReason(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="modal-footer">
+                <button type="button" onClick={() => {
+                  setShowAdjustModal(false);
+                  setSelectedHkItem(null);
+                }} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn">Post Adjustment</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 9: STOCK AUDIT LEDGER */}
+      {showLedgerModal && selectedHkItem && (
+        <div className="modal-overlay">
+          <div className="glass-panel modal-card" style={{ maxWidth: '800px', width: '90%' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Stock Ledger Log - {selectedHkItem.name}</h3>
+              <button onClick={() => {
+                setShowLedgerModal(false);
+                setSelectedHkItem(null);
+                setItemLedger([]);
+              }} className="modal-close">×</button>
+            </div>
+            <div className="table-wrapper" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Type</th>
+                    <th>Qty Delta</th>
+                    <th>Unit Cost</th>
+                    <th>Resulting Stock</th>
+                    <th>Resulting Cost</th>
+                    <th>Operator</th>
+                    <th>Details / Remarks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {itemLedger.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>No ledger transaction history found.</td>
+                    </tr>
+                  ) : (
+                    itemLedger.map((log) => (
+                      <tr key={log.id}>
+                        <td>{new Date(log.created_at).toLocaleString()}</td>
+                        <td>
+                          <span style={{ 
+                            fontSize: '11px', 
+                            textTransform: 'uppercase', 
+                            color: log.transaction_type === 'goods_receipt' ? 'var(--status-available)' : '#cbd5e1', 
+                            fontWeight: '600' 
+                          }}>{log.transaction_type}</span>
+                        </td>
+                        <td>
+                          <strong style={{ color: parseFloat(log.quantity) > 0 ? 'var(--status-available)' : 'var(--status-occupied)' }}>
+                            {parseFloat(log.quantity) > 0 ? `+${parseFloat(log.quantity).toFixed(2)}` : parseFloat(log.quantity).toFixed(2)}
+                          </strong>
+                        </td>
+                        <td>{parseFloat(log.unit_cost).toFixed(2)} INR</td>
+                        <td>{parseFloat(log.resulting_stock).toFixed(2)}</td>
+                        <td>{parseFloat(log.resulting_avg_cost).toFixed(2)} INR</td>
+                        <td>{log.creator_name}</td>
+                        <td style={{ fontSize: '12px' }}>{log.notes || '-'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="modal-footer" style={{ marginTop: '15px' }}>
+              <button onClick={() => {
+                setShowLedgerModal(false);
+                setSelectedHkItem(null);
+                setItemLedger([]);
+              }} className="btn btn-secondary">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 10: CREATE STOCK ITEM */}
+      {showCreateItemModal && (
+        <div className="modal-overlay">
+          <div className="glass-panel modal-card" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Register New Stock Item</h3>
+              <button onClick={() => setShowCreateItemModal(false)} className="modal-close">×</button>
+            </div>
+            <form onSubmit={handleCreateInventoryItem}>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label">SKU / Item Code</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. LINEN-01 or MILK-LIT"
+                  value={newItemSku}
+                  onChange={(e) => setNewItemSku(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label">Item Name</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Single Bed Bedsheet or Whole Milk"
+                  value={newItemName}
+                  onChange={(e) => setNewItemName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label">Category</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Housekeeping, Kitchen, Laundry"
+                  value={newItemCategory}
+                  onChange={(e) => setNewItemCategory(e.target.value)}
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label">Unit of Measure (UOM)</label>
+                <select className="select-dropdown" value={newItemUom} onChange={(e) => setNewItemUom(e.target.value)}>
+                  <option value="Pcs">Pieces (Pcs)</option>
+                  <option value="Kg">Kilograms (Kg)</option>
+                  <option value="Litre">Litres (Litre)</option>
+                  <option value="Box">Boxes (Box)</option>
+                </select>
+              </div>
+              <div className="form-group" style={{ marginBottom: '15px' }}>
+                <label className="form-label">Minimum Stock Alert Level</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="form-input"
+                  value={newItemMinStock}
+                  onChange={(e) => setNewItemMinStock(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="modal-footer">
+                <button type="button" onClick={() => setShowCreateItemModal(false)} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn">Save Item</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 11: REGISTER VENDOR */}
+      {showCreateVendorModal && (
+        <div className="modal-overlay">
+          <div className="glass-panel modal-card" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Register Supplier Vendor</h3>
+              <button onClick={() => setShowCreateVendorModal(false)} className="modal-close">×</button>
+            </div>
+            <form onSubmit={handleCreateVendor}>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label">Vendor / Supplier Name</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Metro Wholesale Supplier"
+                  value={newVendorName}
+                  onChange={(e) => setNewVendorName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label">Contact Person Name</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Ramesh Kumar"
+                  value={newVendorContact}
+                  onChange={(e) => setNewVendorContact(e.target.value)}
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label">Phone Number</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. +91 9876543210"
+                  value={newVendorPhone}
+                  onChange={(e) => setNewVendorPhone(e.target.value)}
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label">Email Address</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  placeholder="e.g. sales@metro.com"
+                  value={newVendorEmail}
+                  onChange={(e) => setNewVendorEmail(e.target.value)}
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label">Office Address</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="City, State"
+                  value={newVendorAddress}
+                  onChange={(e) => setNewVendorAddress(e.target.value)}
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: '15px' }}>
+                <label className="form-label">GSTIN / Tax ID Number</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. 07AAAAA1111A1Z1"
+                  value={newVendorGst}
+                  onChange={(e) => setNewVendorGst(e.target.value)}
+                />
+              </div>
+              <div className="modal-footer">
+                <button type="button" onClick={() => setShowCreateVendorModal(false)} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn">Register Vendor</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 12: CREATE PURCHASE ORDER */}
+      {showCreatePoModal && (
+        <div className="modal-overlay">
+          <div className="glass-panel modal-card" style={{ maxWidth: '650px', width: '90%' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Generate Purchase Order</h3>
+              <button onClick={() => setShowCreatePoModal(false)} className="modal-close">×</button>
+            </div>
+            <form onSubmit={handleCreatePoSubmit}>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label">Select Vendor Supplier</label>
+                <select className="select-dropdown" value={newPoVendorId} onChange={(e) => setNewPoVendorId(e.target.value)} required>
+                  <option value="">-- Choose Vendor --</option>
+                  {vendors.map(v => (
+                    <option key={v.id} value={v.id}>{v.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label className="form-label">PO Items List</label>
+                {newPoItems.map((item, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+                    <select 
+                      className="select-dropdown" 
+                      value={item.inventory_item_id}
+                      onChange={(e) => {
+                        const updated = [...newPoItems];
+                        updated[idx].inventory_item_id = e.target.value;
+                        setNewPoItems(updated);
+                      }}
+                      required
+                      style={{ flex: 2 }}
+                    >
+                      <option value="">-- Choose Stock Item --</option>
+                      {inventoryItems.map(ii => (
+                        <option key={ii.id} value={ii.id}>{ii.name} ({ii.sku})</option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      placeholder="Qty"
+                      className="form-input"
+                      required
+                      value={item.quantity}
+                      onChange={(e) => {
+                        const updated = [...newPoItems];
+                        updated[idx].quantity = e.target.value;
+                        setNewPoItems(updated);
+                      }}
+                      style={{ flex: 1, minWidth: '70px' }}
+                    />
+                    <input
+                      type="number"
+                      placeholder="Unit Cost"
+                      className="form-input"
+                      required
+                      value={item.unit_price}
+                      onChange={(e) => {
+                        const updated = [...newPoItems];
+                        updated[idx].unit_price = e.target.value;
+                        setNewPoItems(updated);
+                      }}
+                      style={{ flex: 1, minWidth: '90px' }}
+                    />
+                    {newPoItems.length > 1 && (
+                      <button type="button" onClick={() => setNewPoItems(newPoItems.filter((_, i) => i !== idx))} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '0 8px', borderRadius: '4px', cursor: 'pointer', height: '36px' }}>×</button>
+                    )}
+                  </div>
+                ))}
+                <button type="button" onClick={() => setNewPoItems([...newPoItems, { inventory_item_id: '', quantity: '', unit_price: '' }])} className="btn btn-secondary btn-sm" style={{ marginTop: '5px' }}>+ Add Row</button>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '15px' }}>
+                <label className="form-label">Order Notes / Terms</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Net 30, deliver by Friday"
+                  value={newPoNotes}
+                  onChange={(e) => setNewPoNotes(e.target.value)}
+                />
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" onClick={() => setShowCreatePoModal(false)} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn">Request Approval</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 13: LOG GOODS RECEIPT NOTE (GRN) */}
+      {showGrnModal && selectedPo && (
+        <div className="modal-overlay">
+          <div className="glass-panel modal-card" style={{ maxWidth: '750px', width: '95%' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Receive Order Goods - PO {selectedPo.po_number}</h3>
+              <button onClick={() => {
+                setShowGrnModal(false);
+                setSelectedPo(null);
+              }} className="modal-close">×</button>
+            </div>
+            <form onSubmit={handleGrnSubmit}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
+                <div className="form-group">
+                  <label className="form-label">Received Date</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    value={receivedDate}
+                    onChange={(e) => setReceivedDate(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Receipt Remarks</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. Checked & verified batch stock"
+                    value={grnNotes}
+                    onChange={(e) => setGrnNotes(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '15px' }}>
+                <label className="form-label" style={{ fontWeight: 'bold' }}>Items Received & Batch Allocations</label>
+                {grnItems.map((item, idx) => (
+                  <div key={idx} style={{ background: 'rgba(0,0,0,0.1)', padding: '10px', borderRadius: '6px', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', fontWeight: 'bold', fontSize: '13px' }}>
+                      <span>{item.item_name}</span>
+                      <span>Target PO: {parseFloat(selectedPo.items[idx]?.quantity).toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '6px' }}>
+                      <div>
+                        <label style={{ fontSize: '11px', display: 'block', marginBottom: '2px' }}>Recv Qty</label>
+                        <input
+                          type="number"
+                          className="form-input"
+                          style={{ padding: '4px', fontSize: '12px' }}
+                          value={item.quantity}
+                          onChange={(e) => {
+                            const updated = [...grnItems];
+                            updated[idx].quantity = e.target.value;
+                            setGrnItems(updated);
+                          }}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', display: 'block', marginBottom: '2px' }}>Actual Cost</label>
+                        <input
+                          type="number"
+                          className="form-input"
+                          style={{ padding: '4px', fontSize: '12px' }}
+                          value={item.unit_cost}
+                          onChange={(e) => {
+                            const updated = [...grnItems];
+                            updated[idx].unit_cost = e.target.value;
+                            setGrnItems(updated);
+                          }}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', display: 'block', marginBottom: '2px' }}>Batch Code (Opt)</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          style={{ padding: '4px', fontSize: '12px' }}
+                          placeholder="e.g. B-01"
+                          value={item.batch_number}
+                          onChange={(e) => {
+                            const updated = [...grnItems];
+                            updated[idx].batch_number = e.target.value;
+                            setGrnItems(updated);
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '11px', display: 'block', marginBottom: '2px' }}>Expiry Date (Opt)</label>
+                        <input
+                          type="date"
+                          className="form-input"
+                          style={{ padding: '4px 2px', fontSize: '11px' }}
+                          value={item.expiry_date}
+                          onChange={(e) => {
+                            const updated = [...grnItems];
+                            updated[idx].expiry_date = e.target.value;
+                            setGrnItems(updated);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" onClick={() => {
+                  setShowGrnModal(false);
+                  setSelectedPo(null);
+                }} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn">Verify & Settle Stock GRN</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
