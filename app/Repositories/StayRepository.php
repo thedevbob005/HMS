@@ -18,7 +18,7 @@ class StayRepository
     public function findStayById(int $hotelId, int $id): ?array
     {
         $stmt = $this->pdo->prepare('
-            SELECT s.*, g.first_name as booker_first_name, g.last_name as booker_last_name, g.phone as booker_phone
+            SELECT s.*, g.id as guest_id, g.first_name as booker_first_name, g.last_name as booker_last_name, g.phone as booker_phone
             FROM stays s
             LEFT JOIN reservations r ON s.reservation_id = r.id
             LEFT JOIN guests g ON r.guest_id = g.id OR (r.id IS NULL AND g.id = (

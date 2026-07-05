@@ -14,6 +14,8 @@ use App\Middleware\HotelScopingMiddleware;
 use App\Controllers\GuestController;
 use App\Controllers\ReservationController;
 use App\Controllers\StayController;
+use App\Controllers\InvoiceController;
+use App\Controllers\ReportController;
 
 return function (App $app) {
     // Health Check Endpoint
@@ -78,6 +80,17 @@ return function (App $app) {
         $group->post('/stays/{stayId}/folio', StayController::class . ':postFolioItem');
         $group->post('/stays/{stayId}/payments', StayController::class . ':collectPayment');
         $group->post('/stays/{stayId}/check-out', StayController::class . ':checkout');
+
+        // Invoices
+        $group->get('/invoices', InvoiceController::class . ':listInvoices');
+        $group->get('/invoices/{invoiceId}', InvoiceController::class . ':getInvoice');
+        $group->get('/stays/{stayId}/invoice', InvoiceController::class . ':getStayInvoice');
+
+        // Reports
+        $group->get('/reports/collection', ReportController::class . ':getCollectionReport');
+
+        // Message Queue / Logs
+        $group->get('/message-queue', InvoiceController::class . ':listMessages');
     })
     ->add(HotelScopingMiddleware::class)
     ->add(AuthenticationMiddleware::class);

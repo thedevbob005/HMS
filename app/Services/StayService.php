@@ -20,6 +20,8 @@ class StayService
     private ReservationRepository $reservationRepository;
     private RoomService $roomService;
     private AuditLogService $auditLogService;
+    private InvoiceService $invoiceService;
+    private MessagingService $messagingService;
     private PDO $pdo;
 
     public function __construct(
@@ -28,6 +30,8 @@ class StayService
         ReservationRepository $reservationRepository,
         RoomService $roomService,
         AuditLogService $auditLogService,
+        InvoiceService $invoiceService,
+        MessagingService $messagingService,
         PDO $pdo
     ) {
         $this->stayRepository = $stayRepository;
@@ -35,6 +39,8 @@ class StayService
         $this->reservationRepository = $reservationRepository;
         $this->roomService = $roomService;
         $this->auditLogService = $auditLogService;
+        $this->invoiceService = $invoiceService;
+        $this->messagingService = $messagingService;
         $this->pdo = $pdo;
     }
 
@@ -239,6 +245,30 @@ class StayService
                 ['reservation_id' => $resId, 'status' => 'Active'],
                 $userId
             );
+
+            // Enqueue Check-in Confirmation Message
+            $freshStay = $this->stayRepository->findStayById($hotelId, $stayId);
+            if ($freshStay && !empty($freshStay['booker_phone'])) {
+                $stmtHotel = $this->pdo->prepare('SELECT name FROM hotels WHERE id = :id');
+                $stmtHotel->execute([':id' => $hotelId]);
+                $hotelName = $stmtHotel->fetchColumn() ?: 'Hotel';
+
+                $roomNumbers = array_map(fn($rm) => $rm['room_number'], $freshStay['rooms']);
+                $roomsStr = implode(', ', $roomNumbers);
+
+                $this->messagingService->enqueueNotification(
+                    $hotelId,
+                    'SMS',
+                    $freshStay['booker_phone'],
+                    'checkin_confirm',
+                    [
+                        'guest_name' => $freshStay['booker_first_name'] . ' ' . $freshStay['booker_last_name'],
+                        'hotel_name' => $hotelName,
+                        'rooms' => $roomsStr,
+                        'stay_id' => $stayId
+                    ]
+                );
+            }
 
             $this->pdo->commit();
             return $this->stayRepository->findStayById($hotelId, $stayId);
@@ -545,6 +575,30 @@ class StayService
                 ['status' => 'Completed', 'checkout_at' => $nowStr],
                 $userId
             );
+
+            // 7. Generate Invoice (GST-ready tax record)
+            $invoice = $this->invoiceService->generateInvoiceForStay($hotelId, $stayId, $userId);
+
+            // 8. Enqueue Checkout Receipt notification
+            if (!empty($stay['booker_phone'])) {
+                $stmtHotel = $this->pdo->prepare('SELECT name FROM hotels WHERE id = :id');
+                $stmtHotel->execute([':id' => $hotelId]);
+                $hotelName = $stmtHotel->fetchColumn() ?: 'Hotel';
+
+                $this->messagingService->enqueueNotification(
+                    $hotelId,
+                    'SMS',
+                    $stay['booker_phone'],
+                    'checkout_receipt',
+                    [
+                        'guest_name' => $stay['booker_first_name'] . ' ' . $stay['booker_last_name'],
+                        'hotel_name' => $hotelName,
+                        'amount' => $invoice['total_amount'],
+                        'invoice_number' => $invoice['invoice_number'],
+                        'stay_id' => $stayId
+                    ]
+                );
+            }
 
             $this->pdo->commit();
             return $this->stayRepository->findStayById($hotelId, $stayId);

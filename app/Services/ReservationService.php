@@ -18,6 +18,7 @@ class ReservationService
     private RoomRepository $roomRepository;
     private RoomService $roomService;
     private AuditLogService $auditLogService;
+    private MessagingService $messagingService;
     private PDO $pdo;
 
     public function __construct(
@@ -25,12 +26,14 @@ class ReservationService
         RoomRepository $roomRepository,
         RoomService $roomService,
         AuditLogService $auditLogService,
+        MessagingService $messagingService,
         PDO $pdo
     ) {
         $this->reservationRepository = $reservationRepository;
         $this->roomRepository = $roomRepository;
         $this->roomService = $roomService;
         $this->auditLogService = $auditLogService;
+        $this->messagingService = $messagingService;
         $this->pdo = $pdo;
     }
 
@@ -169,6 +172,32 @@ class ReservationService
                 $userId
             );
 
+            // Enqueue Booking Confirmation Message
+            $freshRes = $this->reservationRepository->findReservationById($hotelId, $resId);
+            if ($freshRes && !empty($freshRes['phone'])) {
+                $stmtHotel = $this->pdo->prepare('SELECT name FROM hotels WHERE id = :id');
+                $stmtHotel->execute([':id' => $hotelId]);
+                $hotelName = $stmtHotel->fetchColumn() ?: 'Hotel';
+
+                $roomNumbers = array_map(fn($rm) => $rm['room_number'], $freshRes['rooms']);
+                $roomsStr = implode(', ', $roomNumbers);
+
+                $this->messagingService->enqueueNotification(
+                    $hotelId,
+                    'SMS',
+                    $freshRes['phone'],
+                    'booking_confirm',
+                    [
+                        'guest_name' => $freshRes['first_name'] . ' ' . $freshRes['last_name'],
+                        'hotel_name' => $hotelName,
+                        'rooms' => $roomsStr,
+                        'checkin_date' => $freshRes['checkin_date'],
+                        'checkout_date' => $freshRes['checkout_date'],
+                        'reservation_id' => $resId
+                    ]
+                );
+            }
+
             $this->pdo->commit();
             return $this->reservationRepository->findReservationById($hotelId, $resId);
         } catch (Exception $e) {
@@ -201,6 +230,28 @@ class ReservationService
                 ['status' => 'Cancelled'],
                 $userId
             );
+
+            if ($res && !empty($res['phone'])) {
+                $stmtHotel = $this->pdo->prepare('SELECT name FROM hotels WHERE id = :id');
+                $stmtHotel->execute([':id' => $hotelId]);
+                $hotelName = $stmtHotel->fetchColumn() ?: 'Hotel';
+
+                $roomNumbers = array_map(fn($rm) => $rm['room_number'], $res['rooms']);
+                $roomsStr = implode(', ', $roomNumbers);
+
+                $this->messagingService->enqueueNotification(
+                    $hotelId,
+                    'SMS',
+                    $res['phone'],
+                    'booking_cancel',
+                    [
+                        'guest_name' => $res['first_name'] . ' ' . $res['last_name'],
+                        'hotel_name' => $hotelName,
+                        'rooms' => $roomsStr,
+                        'reservation_id' => $resId
+                    ]
+                );
+            }
 
             $this->pdo->commit();
             $res['status'] = 'Cancelled';

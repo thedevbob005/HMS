@@ -57,7 +57,7 @@ function App() {
   const [loginPassword, setLoginPassword] = useState('');
 
   // App Tabs
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'hotels' | 'staff' | 'room-config' | 'rooms' | 'guests' | 'reservations' | 'stays'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'hotels' | 'staff' | 'room-config' | 'rooms' | 'guests' | 'reservations' | 'stays' | 'invoices' | 'reports' | 'notifications'>('dashboard');
 
   // Loaded DB data
   const [hotels, setHotels] = useState<Hotel[]>([]);
@@ -115,13 +115,17 @@ function App() {
   const [newFolioDesc, setNewFolioDesc] = useState('');
   const [newFolioAmount, setNewFolioAmount] = useState('');
 
-  // Stay payment
-  const [newStayPayMethod, setNewStayPayMethod] = useState('Cash');
-  const [newStayPayAmount, setNewStayPayAmount] = useState('');
-  const [newStayPayRef, setNewStayPayRef] = useState('');
-
   // Search/Filters
   const [guestSearch, setGuestSearch] = useState('');
+
+  // Phase 4 State
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [collections, setCollections] = useState<any[]>([]);
+  const [colStartDate, setColStartDate] = useState(new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]);
+  const [colEndDate, setColEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [splitPayments, setSplitPayments] = useState<{ method: string, amount: string, ref: string }[]>([{ method: 'Cash', amount: '', ref: '' }]);
 
   // Modals state
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
@@ -253,6 +257,21 @@ function App() {
       const styData = await styRes.json();
       if (styData.success) setStays(styData.data);
 
+      // Fetch invoices
+      const invRes = await fetch(`/api/hotels/${activeHotelId}/invoices`, { headers: getHeaders() });
+      const invData = await invRes.json();
+      if (invData.success) setInvoices(invData.data);
+
+      // Fetch messages queue logs
+      const msgRes = await fetch(`/api/hotels/${activeHotelId}/message-queue`, { headers: getHeaders() });
+      const msgData = await msgRes.json();
+      if (msgData.success) setMessages(msgData.data);
+
+      // Fetch collections report metrics
+      const colRes = await fetch(`/api/hotels/${activeHotelId}/reports/collection?start_date=${colStartDate}&end_date=${colEndDate}`, { headers: getHeaders() });
+      const colData = await colRes.json();
+      if (colData.success) setCollections(colData.data);
+
     } catch (e) {
       showFeedback('danger', 'Failed to retrieve hotel-specific metadata.');
     }
@@ -268,7 +287,7 @@ function App() {
     if (token && activeHotelId > 0) {
       fetchScopedData();
     }
-  }, [token, activeHotelId, activeTab, guestSearch]);
+  }, [token, activeHotelId, activeTab, guestSearch, colStartDate, colEndDate]);
 
   const updateActiveHotel = (id: number) => {
     setActiveHotelId(id);
@@ -827,36 +846,7 @@ function App() {
     }
   };
 
-  // Collect Folio Payment
-  const handleCollectStayPayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedStay) return;
-    try {
-      const res = await fetch(`/api/hotels/${activeHotelId}/stays/${selectedStay.id}/payments`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify({
-          payment_method: newStayPayMethod,
-          amount: parseFloat(newStayPayAmount),
-          transaction_reference: newStayPayRef
-        })
-      });
-      const data = await res.json();
-      if (data.success) {
-        showFeedback('success', 'Payment collected and applied to folio.');
-        setNewStayPayAmount('');
-        setNewStayPayRef('');
-        // Refresh selected stay
-        const stayRes = await fetch(`/api/hotels/${activeHotelId}/stays/${selectedStay.id}`, { headers: getHeaders() });
-        const stayData = await stayRes.json();
-        if (stayData.success) setSelectedStay(stayData.data);
-      } else {
-        showFeedback('danger', data.message);
-      }
-    } catch (e) {
-      showFeedback('danger', 'Failed to record payment.');
-    }
-  };
+
 
   // Complete Checkout
   const handleCheckout = async (overrideUnsettled: boolean) => {
@@ -1024,6 +1014,37 @@ function App() {
               className={`nav-button ${activeTab === 'stays' ? 'active' : ''}`}
             >
               Checked In Stays
+            </button>
+          </li>
+          <li className="nav-item">
+            <button
+              onClick={() => {
+                setActiveTab('invoices');
+                setSelectedInvoice(null);
+              }}
+              className={`nav-button ${activeTab === 'invoices' ? 'active' : ''}`}
+            >
+              Invoices
+            </button>
+          </li>
+          <li className="nav-item">
+            <button
+              onClick={() => {
+                setActiveTab('reports');
+              }}
+              className={`nav-button ${activeTab === 'reports' ? 'active' : ''}`}
+            >
+              Financial Reports
+            </button>
+          </li>
+          <li className="nav-item">
+            <button
+              onClick={() => {
+                setActiveTab('notifications');
+              }}
+              className={`nav-button ${activeTab === 'notifications' ? 'active' : ''}`}
+            >
+              Message Queue Logs
             </button>
           </li>
         </ul>
@@ -2058,18 +2079,75 @@ function App() {
                       </div>
 
                       <div style={{ border: '1px solid rgba(0,0,0,0.08)', padding: '12px', borderRadius: '6px' }}>
-                        <h4 style={{ margin: '0 0 8px 0', fontSize: '14px' }}>Collect Stay Payment</h4>
-                        <form onSubmit={handleCollectStayPayment}>
-                          <select className="select-dropdown select-dropdown-sm" style={{ marginBottom: '6px', height: '32px', fontSize: '12px' }} value={newStayPayMethod} onChange={(e) => setNewStayPayMethod(e.target.value)}>
-                            <option value="Cash">Cash</option>
-                            <option value="Card">Card</option>
-                            <option value="UPI">UPI</option>
-                            <option value="Bank">Bank Transfer</option>
-                          </select>
-                          <input type="number" className="form-input form-input-sm" style={{ marginBottom: '6px', height: '32px', fontSize: '12px' }} placeholder="Amount INR" value={newStayPayAmount} onChange={(e) => setNewStayPayAmount(e.target.value)} required />
-                          <input type="text" className="form-input form-input-sm" style={{ marginBottom: '8px', height: '32px', fontSize: '12px' }} placeholder="Tx Ref/UTR (Optional)" value={newStayPayRef} onChange={(e) => setNewStayPayRef(e.target.value)} />
-                          <button type="submit" className="btn btn-sm btn-secondary" style={{ width: '100%', background: 'var(--status-available)', color: 'white' }}>Apply Payment</button>
-                        </form>
+                        <h4 style={{ margin: '0 0 8px 0', fontSize: '14px' }}>Collect Stay Payment (Split/Single)</h4>
+                        {splitPayments.map((p, idx) => (
+                          <div key={idx} style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+                            <select className="select-dropdown select-dropdown-sm" style={{ flex: 1, height: '32px', fontSize: '12px' }} value={p.method} onChange={(e) => {
+                              const updated = [...splitPayments];
+                              updated[idx].method = e.target.value;
+                              setSplitPayments(updated);
+                            }}>
+                              <option value="Cash">Cash</option>
+                              <option value="Card">Card</option>
+                              <option value="UPI">UPI</option>
+                              <option value="Bank">Bank Transfer</option>
+                            </select>
+                            <input type="number" className="form-input form-input-sm" style={{ flex: 1.2, height: '32px', fontSize: '12px', padding: '4px' }} placeholder="Amount" value={p.amount} onChange={(e) => {
+                              const updated = [...splitPayments];
+                              updated[idx].amount = e.target.value;
+                              setSplitPayments(updated);
+                            }} required />
+                            <input type="text" className="form-input form-input-sm" style={{ flex: 1, height: '32px', fontSize: '12px', padding: '4px' }} placeholder="Ref" value={p.ref} onChange={(e) => {
+                              const updated = [...splitPayments];
+                              updated[idx].ref = e.target.value;
+                              setSplitPayments(updated);
+                            }} />
+                            {splitPayments.length > 1 && (
+                              <button type="button" onClick={() => setSplitPayments(splitPayments.filter((_, i) => i !== idx))} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '0 8px', borderRadius: '4px', cursor: 'pointer' }}>×</button>
+                            )}
+                          </div>
+                        ))}
+                        <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+                          <button type="button" onClick={() => setSplitPayments([...splitPayments, { method: 'Cash', amount: '', ref: '' }])} className="btn btn-sm btn-secondary" style={{ flex: 1, fontSize: '11px', padding: '4px' }}>+ Split Method</button>
+                          <button type="button" onClick={async () => {
+                            let successCount = 0;
+                            let errors = [];
+                            for (const p of splitPayments) {
+                              const amt = parseFloat(p.amount);
+                              if (isNaN(amt) || amt <= 0) continue;
+                              try {
+                                const res = await fetch(`/api/hotels/${activeHotelId}/stays/${selectedStay.id}/payments`, {
+                                  method: 'POST',
+                                  headers: getHeaders(),
+                                  body: JSON.stringify({
+                                    payment_method: p.method,
+                                    amount: amt,
+                                    transaction_reference: p.ref
+                                  })
+                                });
+                                const data = await res.json();
+                                if (data.success) {
+                                  successCount++;
+                                } else {
+                                  errors.push(data.message);
+                                }
+                              } catch (e) {
+                                errors.push('Connection error');
+                              }
+                            }
+                            if (successCount > 0) {
+                              showFeedback('success', `Applied ${successCount} payment allocations.`);
+                              setSplitPayments([{ method: 'Cash', amount: '', ref: '' }]);
+                              // Refresh selected stay
+                              const stayRes = await fetch(`/api/hotels/${activeHotelId}/stays/${selectedStay.id}`, { headers: getHeaders() });
+                              const stayData = await stayRes.json();
+                              if (stayData.success) setSelectedStay(stayData.data);
+                            }
+                            if (errors.length > 0) {
+                              showFeedback('danger', `Errors: ${errors.join(', ')}`);
+                            }
+                          }} className="btn btn-sm" style={{ flex: 1.5, background: 'var(--status-available)', color: '#fff', fontSize: '11px', padding: '4px' }}>Apply Payments</button>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -2094,8 +2172,298 @@ function App() {
               )}
             </div>
           )}
+
+          {/* 9. INVOICES DIRECTORY */}
+          {activeTab === 'invoices' && (
+            <div className="glass-panel">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <h2 className="page-title" style={{ margin: 0 }}>GST Invoices Directory</h2>
+              </div>
+              <div className="table-wrapper">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Invoice No.</th>
+                      <th>Guest Name</th>
+                      <th>Subtotal</th>
+                      <th>CGST/SGST</th>
+                      <th>Total Amount</th>
+                      <th>Status</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoices.map((inv) => (
+                      <tr key={inv.id}>
+                        <td><strong>{inv.invoice_number}</strong></td>
+                        <td>{inv.first_name} {inv.last_name}</td>
+                        <td>{parseFloat(inv.subtotal).toFixed(2)} INR</td>
+                        <td>
+                          {parseFloat(inv.cgst).toFixed(2)} / {parseFloat(inv.sgst).toFixed(2)}
+                        </td>
+                        <td><strong>{parseFloat(inv.total_amount).toFixed(2)} INR</strong></td>
+                        <td>
+                          <span className={`room-status-badge`} style={{ margin: 0, background: inv.status === 'Paid' ? 'var(--status-available)' : 'var(--status-occupied)', color: '#fff' }}>
+                            {inv.status}
+                          </span>
+                        </td>
+                        <td>
+                          <button onClick={async () => {
+                            const res = await fetch(`/api/hotels/${activeHotelId}/invoices/${inv.id}`, { headers: getHeaders() });
+                            const data = await res.json();
+                            if (data.success) {
+                              setSelectedInvoice(data.data);
+                            }
+                          }} className="btn btn-secondary btn-sm" style={{ padding: '6px 10px', fontSize: '12px' }}>Print / View</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* 10. FINANCIAL REPORTS */}
+          {activeTab === 'reports' && (
+            <div className="glass-panel">
+              <h2 className="page-title">Daily Financial Collections Report</h2>
+              <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '20px', alignItems: 'end' }}>
+                <div className="form-group">
+                  <label className="form-label">Start Date</label>
+                  <input type="date" className="form-input" value={colStartDate} onChange={(e) => setColStartDate(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">End Date</label>
+                  <input type="date" className="form-input" value={colEndDate} onChange={(e) => setColEndDate(e.target.value)} />
+                </div>
+                <button onClick={fetchScopedData} className="btn" style={{ height: '40px' }}>Filter Report</button>
+              </div>
+
+              {/* METRIC CARD OVERVIEW BLOCK */}
+              {(() => {
+                let grandTotal = 0;
+                let txCount = 0;
+                let methodTotals: { [key: string]: number } = {};
+                collections.forEach(day => {
+                  grandTotal += day.day_total;
+                  txCount += day.day_count;
+                  day.methods.forEach((m: any) => {
+                    methodTotals[m.payment_method] = (methodTotals[m.payment_method] || 0) + m.total_amount;
+                  });
+                });
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '15px', marginBottom: '25px' }}>
+                    <div style={{ background: 'rgba(157, 59, 248, 0.1)', border: '1px solid var(--primary)', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
+                      <span style={{ fontSize: '12px', color: '#a78bfa', textTransform: 'uppercase', fontWeight: 'bold' }}>Total Collections</span>
+                      <h3 style={{ margin: '8px 0 0 0', fontSize: '20px' }}>{grandTotal.toFixed(2)} INR</h3>
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
+                      <span style={{ fontSize: '12px', color: '#9ca3af', textTransform: 'uppercase' }}>UPI</span>
+                      <h3 style={{ margin: '8px 0 0 0', fontSize: '20px' }}>{(methodTotals['UPI'] || 0).toFixed(2)}</h3>
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
+                      <span style={{ fontSize: '12px', color: '#9ca3af', textTransform: 'uppercase' }}>Cash</span>
+                      <h3 style={{ margin: '8px 0 0 0', fontSize: '20px' }}>{(methodTotals['Cash'] || 0).toFixed(2)}</h3>
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
+                      <span style={{ fontSize: '12px', color: '#9ca3af', textTransform: 'uppercase' }}>Card</span>
+                      <h3 style={{ margin: '8px 0 0 0', fontSize: '20px' }}>{(methodTotals['Card'] || 0).toFixed(2)}</h3>
+                    </div>
+                    <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
+                      <span style={{ fontSize: '12px', color: '#9ca3af', textTransform: 'uppercase' }}>Bank</span>
+                      <h3 style={{ margin: '8px 0 0 0', fontSize: '20px' }}>{(methodTotals['Bank'] || methodTotals['Bank Transfer'] || 0).toFixed(2)}</h3>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="table-wrapper">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Payment Breakdown</th>
+                      <th style={{ textAlign: 'right' }}>Total Collections</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {collections.map((col) => (
+                      <tr key={col.date}>
+                        <td><strong>{col.date}</strong></td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '15px', fontSize: '13px' }}>
+                            {col.methods.map((m: any) => (
+                              <span key={m.payment_method}>
+                                <strong style={{ color: '#a78bfa' }}>{m.payment_method}:</strong> {m.total_amount.toFixed(2)} ({m.transaction_count} tx)
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td style={{ textAlign: 'right', fontWeight: 'bold', color: 'var(--status-available)' }}>
+                          {col.day_total.toFixed(2)} INR
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* 11. MESSAGING NOTIFICATION LOGS */}
+          {activeTab === 'notifications' && (
+            <div className="glass-panel">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <h2 className="page-title" style={{ margin: 0 }}>MSG91 SMS/WhatsApp Queue Logs</h2>
+                <button onClick={fetchScopedData} className="btn btn-secondary btn-sm">Refresh Queue</button>
+              </div>
+              <div className="table-wrapper">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Created At</th>
+                      <th>Type</th>
+                      <th>Channel</th>
+                      <th>Recipient</th>
+                      <th>Status</th>
+                      <th>Retry</th>
+                      <th>Logs/Response</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {messages.map((m) => (
+                      <tr key={m.id}>
+                        <td>{new Date(m.created_at).toLocaleString()}</td>
+                        <td><span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#a78bfa', fontWeight: '600' }}>{m.message_type}</span></td>
+                        <td>{m.channel}</td>
+                        <td><code>{m.recipient}</code></td>
+                        <td>
+                          <span className={`room-status-badge`} style={{ margin: 0, background: m.status === 'sent' ? 'var(--status-available)' : 'var(--status-occupied)', color: '#fff' }}>
+                            {m.status}
+                          </span>
+                        </td>
+                        <td>{m.retry_count} / 3</td>
+                        <td style={{ fontSize: '12px', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {m.error_message ? (
+                            <span style={{ color: 'var(--status-occupied)' }}>Err: {m.error_message}</span>
+                          ) : (
+                            <span style={{ color: '#9ca3af' }}>{m.provider_response || 'No logs'}</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       </main>
+
+      {/* MODAL 4: INVOICE PRINT PREVIEW */}
+      {selectedInvoice && (
+        <div className="modal-overlay">
+          <div className="glass-panel modal-card" style={{ maxWidth: '800px', width: '90%', background: '#fff', color: '#1e293b' }}>
+            <div className="modal-header" style={{ borderBottom: '2px solid #e2e8f0', paddingBottom: '10px' }}>
+              <h3 className="modal-title" style={{ color: '#1e293b' }}>TAX INVOICE - {selectedInvoice.invoice_number}</h3>
+              <button onClick={() => setSelectedInvoice(null)} className="modal-close" style={{ color: '#1e293b' }}>×</button>
+            </div>
+            
+            <div style={{ padding: '20px 0', fontSize: '14px', lineHeight: '1.5' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '25px', borderBottom: '1px solid #e2e8f0', paddingBottom: '20px' }}>
+                <div>
+                  <h4 style={{ margin: '0 0 8px 0', fontSize: '16px', color: '#0f172a' }}>HMS Core Tenancy Hotel</h4>
+                  <p style={{ margin: '0' }}><strong>GSTIN:</strong> 07AAAAA1111A1Z1</p>
+                  <p style={{ margin: '0' }}>New Delhi, Delhi NCR, India</p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ margin: '0' }}><strong>Invoice Number:</strong> {selectedInvoice.invoice_number}</p>
+                  <p style={{ margin: '0' }}><strong>Invoice Date:</strong> {new Date(selectedInvoice.created_at).toLocaleDateString()}</p>
+                  <p style={{ margin: '0' }}><strong>Status:</strong> <span style={{ color: '#16a34a', fontWeight: 'bold' }}>{selectedInvoice.status}</span></p>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '25px' }}>
+                <div>
+                  <h5 style={{ margin: '0 0 6px 0', color: '#64748b', fontSize: '12px', textTransform: 'uppercase' }}>Guest Details</h5>
+                  <p style={{ margin: '0' }}><strong>Name:</strong> {selectedInvoice.first_name} {selectedInvoice.last_name}</p>
+                  <p style={{ margin: '0' }}><strong>Phone:</strong> {selectedInvoice.phone || 'N/A'}</p>
+                  <p style={{ margin: '0' }}><strong>Email:</strong> {selectedInvoice.email || 'N/A'}</p>
+                </div>
+                {selectedInvoice.stay_details && (
+                  <div style={{ textAlign: 'right' }}>
+                    <h5 style={{ margin: '0 0 6px 0', color: '#64748b', fontSize: '12px', textTransform: 'uppercase' }}>Stay Details</h5>
+                    <p style={{ margin: '0' }}><strong>Stay ID:</strong> #{selectedInvoice.stay_details.id}</p>
+                    <p style={{ margin: '0' }}><strong>Check-in:</strong> {new Date(selectedInvoice.stay_details.checkin_at).toLocaleString()}</p>
+                    <p style={{ margin: '0' }}><strong>Checkout:</strong> {new Date(selectedInvoice.stay_details.checked_out_at).toLocaleString()}</p>
+                  </div>
+                )}
+              </div>
+
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '25px' }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #cbd5e1' }}>
+                    <th style={{ textAlign: 'left', padding: '10px' }}>Description</th>
+                    <th style={{ textAlign: 'right', padding: '10px' }}>Base Price</th>
+                    <th style={{ textAlign: 'right', padding: '10px' }}>Taxable Amt</th>
+                    <th style={{ textAlign: 'right', padding: '10px' }}>Tax Amt</th>
+                    <th style={{ textAlign: 'right', padding: '10px' }}>Total Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedInvoice.stay_details && selectedInvoice.stay_details.folio.filter((item: any) => item.item_type !== 'payment_credit').map((item: any) => {
+                    const baseAmt = parseFloat(item.amount);
+                    const taxAmt = parseFloat(item.tax_amount || '0.00');
+                    return (
+                      <tr key={item.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                        <td style={{ padding: '10px' }}>{item.description}</td>
+                        <td style={{ padding: '10px', textAlign: 'right' }}>{baseAmt.toFixed(2)}</td>
+                        <td style={{ padding: '10px', textAlign: 'right' }}>{baseAmt.toFixed(2)}</td>
+                        <td style={{ padding: '10px', textAlign: 'right' }}>{taxAmt.toFixed(2)}</td>
+                        <td style={{ padding: '10px', textAlign: 'right' }}>{(baseAmt + taxAmt).toFixed(2)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '20px' }}>
+                <div></div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: '#f8fafc', padding: '15px', borderRadius: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Subtotal:</span>
+                    <span>{parseFloat(selectedInvoice.subtotal).toFixed(2)} INR</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#64748b' }}>
+                    <span>CGST:</span>
+                    <span>{parseFloat(selectedInvoice.cgst).toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#64748b' }}>
+                    <span>SGST:</span>
+                    <span>{parseFloat(selectedInvoice.sgst).toFixed(2)}</span>
+                  </div>
+                  {parseFloat(selectedInvoice.discount) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ef4444' }}>
+                      <span>Discount Adjustments:</span>
+                      <span>-{parseFloat(selectedInvoice.discount).toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #cbd5e1', paddingTop: '8px', fontWeight: 'bold', fontSize: '16px', color: '#0f172a' }}>
+                    <span>Grand Total:</span>
+                    <span>{parseFloat(selectedInvoice.total_amount).toFixed(2)} INR</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ borderTop: '1px solid #e2e8f0', paddingTop: '15px' }}>
+              <button onClick={() => window.print()} className="btn" style={{ background: '#0f172a' }}>Print Invoice</button>
+              <button onClick={() => setSelectedInvoice(null)} className="btn btn-secondary" style={{ color: '#1e293b' }}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL 1: STATUS SHIFT */}
       {selectedRoom && (

@@ -63,11 +63,20 @@ This document tracks the functional development of the HMS (Hospitality Manageme
   - [x] Active stays dashboard, check-in, room shift trigger
   - [x] Folio details, charges sheet, checkout settlement UI
 
-### [ ] Phase 4: Accounts and Messaging
-- [ ] Payment methods (Cash, Card, UPI, etc.)
-- [ ] Split payment allocations
-- [ ] GST invoice PDF generation
-- [ ] MSG91 SMS/WhatsApp notifications integration
+### [x] Phase 4: Accounts and Messaging
+- [x] Database Schema & Migrations: `invoices`, `message_queue`
+- [x] Split Payments & Refunds: support arrays of payment/refund splits
+- [x] GST Invoice Generation: auto-generate unique sequential GST-ready invoices on checkout/settlement
+- [x] Daily Collection Report: generate payments metrics grouped by date and method
+- [x] MSG91 Messaging Queue:
+  - [x] Notification template bindings (Booking Confirmation, Check-in, Checkout, Cancel)
+  - [x] Enqueuing hooks upon reservation/stay updates
+  - [x] Background worker script (cron task) for sending/retrying
+- [x] Frontend Vite SPA Updates:
+  - [x] Split payment intake form
+  - [x] Invoice download / layout viewer with GST breakdowns
+  - [x] Message queue visibility log
+  - [x] Daily collections report metrics widget
 
 ### [ ] Phase 5: Aadhaar Verification
 - [ ] Sandbox.co.in verification workflow
