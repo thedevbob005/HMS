@@ -11,6 +11,9 @@ use App\Controllers\RoomTypeController;
 use App\Controllers\RoomController;
 use App\Middleware\AuthenticationMiddleware;
 use App\Middleware\HotelScopingMiddleware;
+use App\Controllers\GuestController;
+use App\Controllers\ReservationController;
+use App\Controllers\StayController;
 
 return function (App $app) {
     // Health Check Endpoint
@@ -51,6 +54,30 @@ return function (App $app) {
         $group->get('/rooms', RoomController::class . ':listRooms');
         $group->post('/rooms', RoomController::class . ':createRoom');
         $group->post('/rooms/{roomId}/status', RoomController::class . ':changeStatus');
+
+        // Guests
+        $group->get('/guests', GuestController::class . ':listGuests');
+        $group->post('/guests', GuestController::class . ':createGuest');
+        $group->get('/guests/{guestId}', GuestController::class . ':getGuest');
+        $group->get('/guests/{guestId}/documents', GuestController::class . ':listDocuments');
+        $group->post('/guests/{guestId}/documents', GuestController::class . ':uploadDocument');
+        $group->get('/guests/{guestId}/documents/{docId}/decrypt', GuestController::class . ':decryptDocumentNumber');
+
+        // Reservations
+        $group->get('/reservations', ReservationController::class . ':listReservations');
+        $group->post('/reservations', ReservationController::class . ':createReservation');
+        $group->get('/reservations/{resId}', ReservationController::class . ':getReservation');
+        $group->post('/reservations/{resId}/cancel', ReservationController::class . ':cancelReservation');
+        $group->get('/rooms/{roomId}/check-availability', ReservationController::class . ':checkAvailability');
+
+        // Stays
+        $group->post('/stays/check-in', StayController::class . ':checkin');
+        $group->get('/stays', StayController::class . ':listStays');
+        $group->get('/stays/{stayId}', StayController::class . ':getStay');
+        $group->post('/stays/{stayId}/room-shift', StayController::class . ':roomShift');
+        $group->post('/stays/{stayId}/folio', StayController::class . ':postFolioItem');
+        $group->post('/stays/{stayId}/payments', StayController::class . ':collectPayment');
+        $group->post('/stays/{stayId}/check-out', StayController::class . ':checkout');
     })
     ->add(HotelScopingMiddleware::class)
     ->add(AuthenticationMiddleware::class);

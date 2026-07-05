@@ -39,12 +39,29 @@ This document tracks the functional development of the HMS (Hospitality Manageme
 - [x] Vite SPA: room type and rate rule configuration interface
 - [x] Vite SPA: rooms status grid and manual transition controls
 
-### [ ] Phase 3: Guest, Reservation, Check-in, Checkout
-- [ ] Guest profile registration
-- [ ] Identity document uploads (access guarded)
-- [ ] Reservation booking calendar
-- [ ] Check-in flow and advance payments
-- [ ] Checkout calculations, folios, and invoicing
+### [x] Phase 3: Guest, Reservation, Check-in, Checkout
+- [x] Guest profile registration
+  - [x] Migration for `guests`, `guest_identity_documents`
+  - [x] Backend: Guest profile CRUD (Repository, Validator, Service, Controller)
+- [x] Identity document uploads (access guarded)
+  - [x] Backend: File upload handling with secure paths and permission checks
+- [x] Reservation booking calendar
+  - [x] Migration for `reservations`, `reservation_rooms`, `reservation_guests`
+  - [x] Backend: Room availability checker service
+  - [x] Backend: Reservation CRUD (Repository, Validator, Service, Controller)
+- [x] Check-in flow and advance payments
+  - [x] Migration for `stays`, `stay_rooms`, `stay_guests`, `payments`
+  - [x] Backend: Check-in service for bookings and walk-ins
+- [x] Checkout calculations, folios, and invoicing
+  - [x] Migration for `room_shift_logs`, `folio_items`
+  - [x] Backend: Room shift workflow and history tracking
+  - [x] Backend: Folio items manager (charges, payments, adjustments)
+  - [x] Backend: Checkout logic, settlement validator, and invoice generation
+- [x] Vite SPA Frontend Integration for Phase 3
+  - [x] Guest profile directory and identity document viewer
+  - [x] Room availability grid and reservation manager
+  - [x] Active stays dashboard, check-in, room shift trigger
+  - [x] Folio details, charges sheet, checkout settlement UI
 
 ### [ ] Phase 4: Accounts and Messaging
 - [ ] Payment methods (Cash, Card, UPI, etc.)
