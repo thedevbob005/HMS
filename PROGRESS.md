@@ -78,10 +78,15 @@ This document tracks the functional development of the HMS (Hospitality Manageme
   - [x] Message queue visibility log
   - [x] Daily collections report metrics widget
 
-### [ ] Phase 5: Aadhaar Verification
-- [ ] Sandbox.co.in verification workflow
-- [ ] Masked Aadhaar storage logic
-- [ ] Audited manual identity capture fallback
+### [x] Phase 5: Aadhaar Verification
+- [x] Database Schema & Migrations: `identity_verification_logs` table & columns (`verification_status`, `verification_timestamp`, `provider_reference_id`) in `guest_identity_documents`
+- [x] Integrations Client: Sandbox.co.in OTP verification API workflow service wrapper with environment configuration support
+- [x] Manual Fallback Logic: audited manual identity capture override option with recorded supervisor reason and metadata logging
+- [x] Controller & Routing Layer: verify OTP request, verify OTP submit, manual fallback override, and logs retrieval API endpoints
+- [x] Frontend React SPA UI updates:
+  - [x] OTP input confirmation modal and status badge updates next to guest identity documents
+  - [x] Manual fallback reason form panel
+  - [x] identity verification audit logs table widget
 
 ### [ ] Phase 6: Housekeeping
 - [ ] Checkout cleaning task auto-generation

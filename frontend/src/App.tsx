@@ -127,6 +127,16 @@ function App() {
   const [colEndDate, setColEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [splitPayments, setSplitPayments] = useState<{ method: string, amount: string, ref: string }[]>([{ method: 'Cash', amount: '', ref: '' }]);
 
+  // Phase 5 State
+  const [verifyingDoc, setVerifyingDoc] = useState<any | null>(null);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpClientId, setOtpClientId] = useState('');
+  const [fallbackReason, setFallbackReason] = useState('');
+  const [verifLogs, setVerifLogs] = useState<any[]>([]);
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [showFallbackModal, setShowFallbackModal] = useState(false);
+  const [showLogsModal, setShowLogsModal] = useState(false);
+
   // Modals state
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [newRoomStatus, setNewRoomStatus] = useState('');
@@ -659,6 +669,107 @@ function App() {
       }
     } catch (e) {
       showFeedback('danger', 'Failed to decrypt document.');
+    }
+  };
+
+  // Phase 5 Action Handlers
+  const handleFetchVerifLogs = async (doc: any) => {
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/guests/${selectedGuest.id}/documents/${doc.id}/verification-logs`, {
+        headers: getHeaders()
+      });
+      const data = await res.json();
+      if (data.success) {
+        setVerifLogs(data.data);
+        setShowLogsModal(true);
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to retrieve verification logs.');
+    }
+  };
+
+  const handleRequestOtp = async (doc: any) => {
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/guests/${selectedGuest.id}/documents/${doc.id}/verify/otp-request`, {
+        method: 'POST',
+        headers: getHeaders()
+      });
+      const data = await res.json();
+      if (data.success) {
+        setVerifyingDoc(doc);
+        setOtpClientId(data.data.client_id);
+        setOtpCode('');
+        setShowOtpModal(true);
+        showFeedback('success', data.message);
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to request verification OTP.');
+    }
+  };
+
+  const handleVerifyOtpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!verifyingDoc) return;
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/guests/${selectedGuest.id}/documents/${verifyingDoc.id}/verify/otp-submit`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          otp: otpCode,
+          client_id: otpClientId
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showFeedback('success', data.message);
+        setShowOtpModal(false);
+        setVerifyingDoc(null);
+        // Refresh documents list
+        const docRes = await fetch(`/api/hotels/${activeHotelId}/guests/${selectedGuest.id}/documents`, { headers: getHeaders() });
+        const docData = await docRes.json();
+        if (docData.success) setGuestDocs(docData.data);
+        // Refresh guest details
+        fetchScopedData();
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to verify OTP.');
+    }
+  };
+
+  const handleManualFallbackSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!verifyingDoc) return;
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/guests/${selectedGuest.id}/documents/${verifyingDoc.id}/verify/manual-fallback`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          reason: fallbackReason
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showFeedback('success', data.message);
+        setShowFallbackModal(false);
+        setVerifyingDoc(null);
+        setFallbackReason('');
+        // Refresh documents list
+        const docRes = await fetch(`/api/hotels/${activeHotelId}/guests/${selectedGuest.id}/documents`, { headers: getHeaders() });
+        const docData = await docRes.json();
+        if (docData.success) setGuestDocs(docData.data);
+        // Refresh guest details
+        fetchScopedData();
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to apply manual override.');
     }
   };
 
@@ -1618,14 +1729,47 @@ function App() {
                         <div key={doc.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.4)', padding: '10px 15px', borderRadius: '6px', border: '1px solid rgba(0,0,0,0.05)' }}>
                           <div>
                             <span style={{ fontWeight: '600' }}>{doc.document_type}</span>: <code style={{ background: 'rgba(0,0,0,0.05)', padding: '2px 4px', borderRadius: '4px' }}>{doc.document_number_masked}</code>
+                            
+                            {/* Verification Status Badge */}
+                            <span style={{ 
+                              marginLeft: '8px',
+                              padding: '2px 8px',
+                              borderRadius: '12px',
+                              fontSize: '11px',
+                              fontWeight: 'bold',
+                              color: '#fff',
+                              background: doc.verification_status === 'verified' ? 'var(--status-available)' :
+                                          doc.verification_status === 'manual_fallback' ? '#d97706' :
+                                          doc.verification_status === 'pending' ? 'var(--primary)' :
+                                          doc.verification_status === 'failed' ? 'var(--status-occupied)' : '#9ca3af'
+                            }}>
+                              {doc.verification_status === 'verified' ? 'Verified (OTP)' :
+                               doc.verification_status === 'manual_fallback' ? 'Verified (Manual)' :
+                               doc.verification_status === 'pending' ? 'Pending OTP' :
+                               doc.verification_status === 'failed' ? 'Verification Failed' : 'Not Verified'}
+                            </span>
+
                             {doc.file_path && (
                               <div style={{ marginTop: '4px', fontSize: '12px' }}>
                                 <a href={doc.file_path} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>View Uploaded File</a>
                               </div>
                             )}
                           </div>
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <button onClick={() => handleDecryptDoc(doc.id)} className="btn btn-secondary btn-sm" style={{ padding: '6px 10px', fontSize: '12px' }}>Decrypt</button>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <button onClick={() => handleDecryptDoc(doc.id)} className="btn btn-secondary btn-sm" style={{ padding: '4px 8px', fontSize: '11px' }}>Decrypt</button>
+                            
+                            {doc.document_type === 'Aadhaar' && doc.verification_status !== 'verified' && doc.verification_status !== 'manual_fallback' && (
+                              <>
+                                <button onClick={() => handleRequestOtp(doc)} className="btn btn-sm" style={{ padding: '4px 8px', fontSize: '11px', background: 'var(--primary)', color: '#fff' }}>Verify Aadhaar</button>
+                                <button onClick={() => {
+                                  setVerifyingDoc(doc);
+                                  setFallbackReason('');
+                                  setShowFallbackModal(true);
+                                }} className="btn btn-secondary btn-sm" style={{ padding: '4px 8px', fontSize: '11px', borderColor: '#d97706', color: '#d97706' }}>Manual Override</button>
+                              </>
+                            )}
+                            
+                            <button onClick={() => handleFetchVerifLogs(doc)} className="btn btn-secondary btn-sm" style={{ padding: '4px 8px', fontSize: '11px' }}>Logs</button>
                           </div>
                         </div>
                       ))}
@@ -2460,6 +2604,145 @@ function App() {
             <div className="modal-footer" style={{ borderTop: '1px solid #e2e8f0', paddingTop: '15px' }}>
               <button onClick={() => window.print()} className="btn" style={{ background: '#0f172a' }}>Print Invoice</button>
               <button onClick={() => setSelectedInvoice(null)} className="btn btn-secondary" style={{ color: '#1e293b' }}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: AADHAAR OTP CONFIRMATION */}
+      {showOtpModal && verifyingDoc && (
+        <div className="modal-overlay">
+          <div className="glass-panel modal-card" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Enter Aadhaar Verification OTP</h3>
+              <button onClick={() => {
+                setShowOtpModal(false);
+                setVerifyingDoc(null);
+              }} className="modal-close">×</button>
+            </div>
+            <form onSubmit={handleVerifyOtpSubmit}>
+              <div style={{ marginBottom: '15px', fontSize: '14px', color: '#e2e8f0' }}>
+                <p>An OTP code has been requested for Aadhaar: <code>{verifyingDoc.document_number_masked}</code>.</p>
+                <p style={{ fontStyle: 'italic', color: '#cbd5e1' }}>In Mock Sandbox Mode, use code <strong>123456</strong>.</p>
+              </div>
+              <div className="form-group" style={{ marginBottom: '15px' }}>
+                <label className="form-label">OTP Verification Code</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Enter 6-digit OTP code"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value)}
+                  maxLength={6}
+                  required
+                />
+              </div>
+              <div className="modal-footer">
+                <button type="button" onClick={() => {
+                  setShowOtpModal(false);
+                  setVerifyingDoc(null);
+                }} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn">Verify Aadhaar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 6: AADHAAR MANUAL OVERRIDE FALLBACK */}
+      {showFallbackModal && verifyingDoc && (
+        <div className="modal-overlay">
+          <div className="glass-panel modal-card" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Manual Identity Override</h3>
+              <button onClick={() => {
+                setShowFallbackModal(false);
+                setVerifyingDoc(null);
+              }} className="modal-close">×</button>
+            </div>
+            <form onSubmit={handleManualFallbackSubmit}>
+              <div style={{ marginBottom: '15px', fontSize: '14px', color: '#e2e8f0' }}>
+                <p>Provide the supervisor reason for bypassing Sandbox Aadhaar verification for document: <code>{verifyingDoc.document_number_masked}</code>.</p>
+              </div>
+              <div className="form-group" style={{ marginBottom: '15px' }}>
+                <label className="form-label">Override Reason</label>
+                <textarea
+                  className="form-input"
+                  rows={3}
+                  placeholder="e.g. Sandbox API Down - verified physical card copy"
+                  value={fallbackReason}
+                  onChange={(e) => setFallbackReason(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="modal-footer">
+                <button type="button" onClick={() => {
+                  setShowFallbackModal(false);
+                  setVerifyingDoc(null);
+                }} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn" style={{ background: '#d97706', borderColor: '#d97706' }}>Apply Override</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 7: IDENTITY VERIFICATION LOGS */}
+      {showLogsModal && (
+        <div className="modal-overlay">
+          <div className="glass-panel modal-card" style={{ maxWidth: '800px', width: '90%' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Identity Verification Logs</h3>
+              <button onClick={() => {
+                setShowLogsModal(false);
+                setVerifLogs([]);
+              }} className="modal-close">×</button>
+            </div>
+            <div className="table-wrapper" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Action</th>
+                    <th>Status</th>
+                    <th>Provider</th>
+                    <th>Ref ID</th>
+                    <th>Logs / Reason Details</th>
+                    <th>Operator</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {verifLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>No verification attempts logged.</td>
+                    </tr>
+                  ) : (
+                    verifLogs.map((log) => (
+                      <tr key={log.id}>
+                        <td>{new Date(log.created_at).toLocaleString()}</td>
+                        <td><span style={{ fontSize: '11px', textTransform: 'uppercase', color: '#a78bfa', fontWeight: '600' }}>{log.action}</span></td>
+                        <td>
+                          <span className={`room-status-badge`} style={{ margin: 0, background: log.status === 'success' ? 'var(--status-available)' : 'var(--status-occupied)', color: '#fff' }}>
+                            {log.status}
+                          </span>
+                        </td>
+                        <td>{log.provider}</td>
+                        <td><code>{log.reference_id || 'N/A'}</code></td>
+                        <td style={{ fontSize: '12px', maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.details_json}>
+                          {log.details_json || 'No extra info'}
+                        </td>
+                        <td>{log.creator_name || 'System'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="modal-footer" style={{ marginTop: '15px' }}>
+              <button onClick={() => {
+                setShowLogsModal(false);
+                setVerifLogs([]);
+              }} className="btn btn-secondary">Close</button>
             </div>
           </div>
         </div>

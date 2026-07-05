@@ -16,6 +16,7 @@ use App\Controllers\ReservationController;
 use App\Controllers\StayController;
 use App\Controllers\InvoiceController;
 use App\Controllers\ReportController;
+use App\Controllers\AadhaarVerificationController;
 
 return function (App $app) {
     // Health Check Endpoint
@@ -64,6 +65,10 @@ return function (App $app) {
         $group->get('/guests/{guestId}/documents', GuestController::class . ':listDocuments');
         $group->post('/guests/{guestId}/documents', GuestController::class . ':uploadDocument');
         $group->get('/guests/{guestId}/documents/{docId}/decrypt', GuestController::class . ':decryptDocumentNumber');
+        $group->post('/guests/{guestId}/documents/{docId}/verify/otp-request', AadhaarVerificationController::class . ':requestOtp');
+        $group->post('/guests/{guestId}/documents/{docId}/verify/otp-submit', AadhaarVerificationController::class . ':verifyOtp');
+        $group->post('/guests/{guestId}/documents/{docId}/verify/manual-fallback', AadhaarVerificationController::class . ':applyManualFallback');
+        $group->get('/guests/{guestId}/documents/{docId}/verification-logs', AadhaarVerificationController::class . ':listLogs');
 
         // Reservations
         $group->get('/reservations', ReservationController::class . ':listReservations');
