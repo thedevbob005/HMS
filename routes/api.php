@@ -21,6 +21,7 @@ use App\Controllers\HousekeepingController;
 use App\Controllers\InventoryController;
 use App\Controllers\PurchaseController;
 use App\Controllers\KitchenController;
+use App\Controllers\EmployeeController;
 
 return function (App $app) {
     // Health Check Endpoint
@@ -133,6 +134,19 @@ return function (App $app) {
         $group->get('/kitchen/orders', KitchenController::class . ':listOrders');
         $group->post('/kitchen/orders', KitchenController::class . ':createOrder');
         $group->post('/kitchen/orders/{orderId}/status', KitchenController::class . ':updateStatus');
+
+        // Employees & HR
+        $group->get('/employees', EmployeeController::class . ':listEmployees');
+        $group->post('/employees', EmployeeController::class . ':createEmployee');
+        $group->put('/employees/{employeeId}', EmployeeController::class . ':updateEmployee');
+        $group->delete('/employees/{employeeId}', EmployeeController::class . ':deleteEmployee');
+        $group->get('/employees/departments', EmployeeController::class . ':listDepartments');
+        $group->post('/employees/departments', EmployeeController::class . ':createDepartment');
+        $group->get('/employees/shifts', EmployeeController::class . ':listShifts');
+        $group->post('/employees/shifts', EmployeeController::class . ':createShift');
+        $group->get('/employees/attendance', EmployeeController::class . ':listAttendance');
+        $group->post('/employees/attendance/clock', EmployeeController::class . ':clockEmployee');
+        $group->post('/employees/attendance/bulk', EmployeeController::class . ':bulkAttendance');
     })
     ->add(HotelScopingMiddleware::class)
     ->add(AuthenticationMiddleware::class);

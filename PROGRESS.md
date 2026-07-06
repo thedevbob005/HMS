@@ -123,9 +123,17 @@ This document tracks the functional development of the HMS (Hospitality Manageme
   - [x] Room service active orders tracker with quick-status (pending, preparing, served, cancelled) selectors
   - [x] Recipe Costing & Margin Sheet showing ingredient costs and gross profit percentage valuations
 
-### [ ] Phase 9: Employees
-- [ ] Staff profile records, department routing, and shift schedules
-- [ ] Attendance tracking
+### [x] Phase 9: Employees
+- [x] Database Schema & Migrations: create tables for `departments`, `shifts`, `employees`, `employee_attendance`, and `employee_documents`
+- [x] Business Services:
+  - [x] Implement `EmployeeService.php` to handle employee profiles, department/shift management, and file storage links
+  - [x] Implement `AttendanceService.php` for clock-in/clock-out tracking, bulk daily rosters, and status corrections
+  - [x] RBAC Salary protections: restrict visibility of base salary fields based on `employees.view_salary` and `employees.manage_salary` permissions
+- [x] Controller & Routing Layer: endpoints for employee CRUD, clock operations, bulk attendance logs, departments, and shifts
+- [x] Frontend React UI tab:
+  - [x] Employee list grid with add/edit drawers and emergency contact details
+  - [x] Attendance roster tracking daily status (Present, Absent, Leave, Late) and inline clock toggles
+  - [x] Restricted salary details block showing pay fields to authorized staff only
 
 ### [ ] Phase 10: Reporting and Release Hardening
 - [ ] Daily collection, occupancy, GST, and revenue reports

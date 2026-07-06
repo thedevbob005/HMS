@@ -57,7 +57,7 @@ function App() {
   const [loginPassword, setLoginPassword] = useState('');
 
   // App Tabs
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'hotels' | 'staff' | 'room-config' | 'rooms' | 'guests' | 'reservations' | 'stays' | 'invoices' | 'reports' | 'notifications' | 'housekeeping' | 'inventory' | 'kitchen'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'hotels' | 'staff' | 'room-config' | 'rooms' | 'guests' | 'reservations' | 'stays' | 'invoices' | 'reports' | 'notifications' | 'housekeeping' | 'inventory' | 'kitchen' | 'employees'>('dashboard');
 
   // Loaded DB data
   const [hotels, setHotels] = useState<Hotel[]>([]);
@@ -201,6 +201,33 @@ function App() {
   const [newKoMealIncluded, setNewKoMealIncluded] = useState(false);
   const [newKoItems, setNewKoItems] = useState<{ kitchen_item_id: string, quantity: string }[]>([{ kitchen_item_id: '', quantity: '1' }]);
   const [kitchenSubTab, setKitchenSubTab] = useState<'orders' | 'menu' | 'costing'>('orders');
+
+  // Phase 9 Employees State
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [shifts, setShifts] = useState<any[]>([]);
+  const [attendanceList, setAttendanceList] = useState<any[]>([]);
+  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [showCreateEmployeeModal, setShowCreateEmployeeModal] = useState(false);
+  const [showCreateDeptModal, setShowCreateDeptModal] = useState(false);
+  const [showCreateShiftModal, setShowCreateShiftModal] = useState(false);
+  const [empFirstName, setEmpFirstName] = useState('');
+  const [empLastName, setEmpLastName] = useState('');
+  const [empCode, setEmpCode] = useState('');
+  const [empEmail, setEmpEmail] = useState('');
+  const [empPhone, setEmpPhone] = useState('');
+  const [empDeptId, setEmpDeptId] = useState('');
+  const [empShiftId, setEmpShiftId] = useState('');
+  const [empEmergencyName, setEmpEmergencyName] = useState('');
+  const [empEmergencyPhone, setEmpEmergencyPhone] = useState('');
+  const [empSalary, setEmpSalary] = useState('');
+  const [empStatus, setEmpStatus] = useState('Active');
+  const [deptName, setDeptName] = useState('');
+  const [deptCode, setDeptCode] = useState('');
+  const [shiftName, setShiftName] = useState('');
+  const [shiftStart, setShiftStart] = useState('');
+  const [shiftEnd, setShiftEnd] = useState('');
+  const [empSubTab, setEmpSubTab] = useState<'roster' | 'attendance' | 'settings'>('roster');
 
   // Modals state
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
@@ -387,10 +414,45 @@ function App() {
       const costData = await costRes.json();
       if (costData.success) setKitchenCostingSheet(costData.data);
 
+      // Fetch employee module details
+      const empRes = await fetch(`/api/hotels/${activeHotelId}/employees`, { headers: getHeaders() });
+      const empData = await empRes.json();
+      if (empData.success) setEmployees(empData.data);
+
+      const deptRes = await fetch(`/api/hotels/${activeHotelId}/employees/departments`, { headers: getHeaders() });
+      const deptData = await deptRes.json();
+      if (deptData.success) setDepartments(deptData.data);
+
+      const shiftRes = await fetch(`/api/hotels/${activeHotelId}/employees/shifts`, { headers: getHeaders() });
+      const shiftData = await shiftRes.json();
+      if (shiftData.success) setShifts(shiftData.data);
+
+      const attRes = await fetch(`/api/hotels/${activeHotelId}/employees/attendance?date=${attendanceDate}`, { headers: getHeaders() });
+      const attData = await attRes.json();
+      if (attData.success) setAttendanceList(attData.data);
+
     } catch (e) {
       showFeedback('danger', 'Failed to retrieve hotel-specific metadata.');
     }
   };
+
+  const fetchAttendanceForDate = async (date: string) => {
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/employees/attendance?date=${date}`, { headers: getHeaders() });
+      const data = await res.json();
+      if (data.success) {
+        setAttendanceList(data.data);
+      }
+    } catch (e) {
+      // Ignored gracefully in background
+    }
+  };
+
+  useEffect(() => {
+    if (token && activeHotelId > 0 && attendanceDate) {
+      fetchAttendanceForDate(attendanceDate);
+    }
+  }, [token, activeHotelId, attendanceDate]);
 
   useEffect(() => {
     if (token) {
@@ -1277,6 +1339,131 @@ function App() {
     }
   };
 
+  // Phase 9 Employees Action Handlers
+  const handleCreateEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const payload: any = {
+        first_name: empFirstName,
+        last_name: empLastName,
+        employee_code: empCode,
+        email: empEmail || null,
+        phone: empPhone || null,
+        department_id: empDeptId ? parseInt(empDeptId) : null,
+        shift_id: empShiftId ? parseInt(empShiftId) : null,
+        emergency_contact_name: empEmergencyName || null,
+        emergency_contact_phone: empEmergencyPhone || null,
+        status: empStatus
+      };
+      if (empSalary) {
+        payload.salary_base = parseFloat(empSalary);
+      }
+
+      const res = await fetch(`/api/hotels/${activeHotelId}/employees`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        showFeedback('success', data.message);
+        setEmpFirstName('');
+        setEmpLastName('');
+        setEmpCode('');
+        setEmpEmail('');
+        setEmpPhone('');
+        setEmpDeptId('');
+        setEmpShiftId('');
+        setEmpEmergencyName('');
+        setEmpEmergencyPhone('');
+        setEmpSalary('');
+        setEmpStatus('Active');
+        setShowCreateEmployeeModal(false);
+        fetchScopedData();
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to register employee.');
+    }
+  };
+
+  const handleCreateDepartment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/employees/departments`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          name: deptName,
+          code: deptCode
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showFeedback('success', data.message);
+        setDeptName('');
+        setDeptCode('');
+        setShowCreateDeptModal(false);
+        fetchScopedData();
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to create department.');
+    }
+  };
+
+  const handleCreateShift = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/employees/shifts`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          name: shiftName,
+          start_time: shiftStart,
+          end_time: shiftEnd
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showFeedback('success', data.message);
+        setShiftName('');
+        setShiftStart('');
+        setShiftEnd('');
+        setShowCreateShiftModal(false);
+        fetchScopedData();
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to create shift.');
+    }
+  };
+
+  const handleClockEmployee = async (employeeId: number, action: 'in' | 'out') => {
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/employees/attendance/clock`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          employee_id: employeeId,
+          action
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showFeedback('success', data.message);
+        fetchScopedData();
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to update time clock.');
+    }
+  };
+
   // Create Reservation
   const handleCreateReservation = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1690,6 +1877,16 @@ function App() {
               className={`nav-button ${activeTab === 'kitchen' ? 'active' : ''}`}
             >
               Kitchen Room Service
+            </button>
+          </li>
+          <li className="nav-item">
+            <button
+              onClick={() => {
+                setActiveTab('employees');
+              }}
+              className={`nav-button ${activeTab === 'employees' ? 'active' : ''}`}
+            >
+              Employees & Attendance
             </button>
           </li>
         </ul>
@@ -3722,6 +3919,333 @@ function App() {
               )}
             </div>
           )}
+
+          {/* 15. EMPLOYEES & ATTENDANCE DASHBOARD */}
+          {activeTab === 'employees' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 className="page-title" style={{ margin: 0 }}>Staff Registry & Attendance</h2>
+                
+                {/* Sub tabs */}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={() => setEmpSubTab('roster')} className={`btn ${empSubTab === 'roster' ? '' : 'btn-secondary'}`} style={{ fontSize: '13px', padding: '6px 12px' }}>Staff Roster</button>
+                  <button onClick={() => setEmpSubTab('attendance')} className={`btn ${empSubTab === 'attendance' ? '' : 'btn-secondary'}`} style={{ fontSize: '13px', padding: '6px 12px' }}>Attendance Board</button>
+                  <button onClick={() => setEmpSubTab('settings')} className={`btn ${empSubTab === 'settings' ? '' : 'btn-secondary'}`} style={{ fontSize: '13px', padding: '6px 12px' }}>Shifts & Departments</button>
+                </div>
+              </div>
+
+              {/* STAFF ROSTER PANEL */}
+              {empSubTab === 'roster' && (
+                <div className="glass-panel">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <h3 style={{ margin: 0, fontSize: '18px' }}>Active Hotel Staff</h3>
+                    <button onClick={() => setShowCreateEmployeeModal(true)} className="btn btn-sm">Add Employee Profile</button>
+                  </div>
+                  <div className="table-wrapper">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Code</th>
+                          <th>Full Name</th>
+                          <th>Department</th>
+                          <th>Shift</th>
+                          <th>Contact Details</th>
+                          <th>Emergency Contact</th>
+                          <th>Base Salary</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {employees.length === 0 ? (
+                          <tr>
+                            <td colSpan={8} style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>No employee profiles logged.</td>
+                          </tr>
+                        ) : (
+                          employees.map(emp => (
+                            <tr key={emp.id}>
+                              <td><code>{emp.employee_code}</code></td>
+                              <td><strong>{emp.first_name} {emp.last_name}</strong></td>
+                              <td>{emp.department_name || <span style={{ color: '#64748b', fontStyle: 'italic' }}>General</span>}</td>
+                              <td>
+                                {emp.shift_name ? (
+                                  <span>{emp.shift_name} <span style={{ fontSize: '11px', color: '#94a3b8' }}>({emp.start_time.substring(0,5)}-{emp.end_time.substring(0,5)})</span></span>
+                                ) : (
+                                  <span style={{ color: '#64748b', fontStyle: 'italic' }}>General</span>
+                                )}
+                              </td>
+                              <td style={{ fontSize: '12px' }}>
+                                <div>📞 {emp.phone || '-'}</div>
+                                <div>✉️ {emp.email || '-'}</div>
+                              </td>
+                              <td style={{ fontSize: '12px' }}>
+                                {emp.emergency_contact_name ? (
+                                  <div>
+                                    <strong>{emp.emergency_contact_name}</strong>
+                                    <div>📞 {emp.emergency_contact_phone || '-'}</div>
+                                  </div>
+                                ) : (
+                                  '-'
+                                )}
+                              </td>
+                              <td>
+                                {emp.salary_base !== undefined ? (
+                                  <strong>{parseFloat(emp.salary_base).toFixed(2)} INR</strong>
+                                ) : (
+                                  <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '12px' }}>[RESTRICTED]</span>
+                                )}
+                              </td>
+                              <td>
+                                <span style={{ 
+                                  padding: '2px 8px', 
+                                  borderRadius: '12px', 
+                                  fontSize: '11px', 
+                                  background: emp.status === 'Active' ? 'var(--status-available)' : 'var(--status-occupied)', 
+                                  color: '#fff', 
+                                  fontWeight: 'bold' 
+                                }}>
+                                  {emp.status}
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* ATTENDANCE BOARD PANEL */}
+              {empSubTab === 'attendance' && (
+                <div className="glass-panel">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <h3 style={{ margin: 0, fontSize: '18px' }}>Daily Attendance</h3>
+                      <input
+                        type="date"
+                        className="form-input"
+                        style={{ width: '150px', padding: '4px 8px', margin: 0 }}
+                        value={attendanceDate}
+                        onChange={(e) => setAttendanceDate(e.target.value)}
+                      />
+                    </div>
+                    <button onClick={async () => {
+                      // Save bulk attendance roster
+                      const roster = employees.filter(e => e.status === 'Active').map(e => {
+                        const existing = attendanceList.find(a => a.employee_id === e.id);
+                        return {
+                          employee_id: e.id,
+                          status: existing ? existing.status : 'Present',
+                          notes: existing ? existing.notes : ''
+                        };
+                      });
+                      
+                      try {
+                        const res = await fetch(`/api/hotels/${activeHotelId}/employees/attendance/bulk`, {
+                          method: 'POST',
+                          headers: getHeaders(),
+                          body: JSON.stringify({
+                            work_date: attendanceDate,
+                            roster
+                          })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          showFeedback('success', 'Roster attendance logs saved successfully.');
+                          fetchScopedData();
+                        } else {
+                          showFeedback('danger', data.message);
+                        }
+                      } catch (e) {
+                        showFeedback('danger', 'Failed to save attendance.');
+                      }
+                    }} className="btn btn-sm">Save Day Attendance Statuses</button>
+                  </div>
+                  
+                  <div className="table-wrapper">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Code</th>
+                          <th>Employee</th>
+                          <th>Department</th>
+                          <th>Shift</th>
+                          <th>Clock In</th>
+                          <th>Clock Out</th>
+                          <th>Status Tag</th>
+                          <th>Remarks</th>
+                          <th>Timeclock Quick Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {employees.filter(e => e.status === 'Active').length === 0 ? (
+                          <tr>
+                            <td colSpan={9} style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>No active employees found in roster.</td>
+                          </tr>
+                        ) : (
+                          employees.filter(e => e.status === 'Active').map(emp => {
+                            const att = attendanceList.find(a => a.employee_id === emp.id);
+                            
+                            return (
+                              <tr key={emp.id}>
+                                <td><code>{emp.employee_code}</code></td>
+                                <td><strong>{emp.first_name} {emp.last_name}</strong></td>
+                                <td>{emp.department_name || 'General'}</td>
+                                <td>{emp.shift_name || 'General'}</td>
+                                <td>{att && att.clock_in ? new Date(att.clock_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</td>
+                                <td>{att && att.clock_out ? new Date(att.clock_out).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-'}</td>
+                                <td>
+                                  <select 
+                                    className="select-dropdown" 
+                                    style={{ padding: '2px 6px', fontSize: '12px', margin: 0, width: '110px' }}
+                                    value={att ? att.status : 'Present'}
+                                    onChange={(e) => {
+                                      const updatedList = [...attendanceList];
+                                      const idx = updatedList.findIndex(a => a.employee_id === emp.id);
+                                      if (idx >= 0) {
+                                        updatedList[idx].status = e.target.value;
+                                      } else {
+                                        updatedList.push({
+                                          employee_id: emp.id,
+                                          status: e.target.value,
+                                          notes: ''
+                                        });
+                                      }
+                                      setAttendanceList(updatedList);
+                                    }}
+                                  >
+                                    <option value="Present">Present</option>
+                                    <option value="Absent">Absent</option>
+                                    <option value="Leave">Leave</option>
+                                    <option value="Late">Late</option>
+                                  </select>
+                                </td>
+                                <td>
+                                  <input
+                                    type="text"
+                                    placeholder="Remarks..."
+                                    className="form-input"
+                                    style={{ margin: 0, padding: '2px 6px', fontSize: '12px', minWidth: '100px' }}
+                                    value={att && att.notes ? att.notes : ''}
+                                    onChange={(e) => {
+                                      const updatedList = [...attendanceList];
+                                      const idx = updatedList.findIndex(a => a.employee_id === emp.id);
+                                      if (idx >= 0) {
+                                        updatedList[idx].notes = e.target.value;
+                                      } else {
+                                        updatedList.push({
+                                          employee_id: emp.id,
+                                          status: 'Present',
+                                          notes: e.target.value
+                                        });
+                                      }
+                                      setAttendanceList(updatedList);
+                                    }}
+                                  />
+                                </td>
+                                <td>
+                                  <div style={{ display: 'flex', gap: '5px' }}>
+                                    {(!att || !att.clock_in) ? (
+                                      <button 
+                                        onClick={() => handleClockEmployee(emp.id, 'in')} 
+                                        className="btn btn-sm" 
+                                        style={{ padding: '3px 8px', fontSize: '11px', background: 'var(--status-available)', color: '#fff' }}
+                                      >
+                                        Clock In
+                                      </button>
+                                    ) : (!att.clock_out) ? (
+                                      <button 
+                                        onClick={() => handleClockEmployee(emp.id, 'out')} 
+                                        className="btn btn-secondary btn-sm" 
+                                        style={{ padding: '3px 8px', fontSize: '11px', color: 'var(--status-occupied)' }}
+                                      >
+                                        Clock Out
+                                      </button>
+                                    ) : (
+                                      <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 'bold' }}>✓ Shift Complete</span>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* SETTINGS (SHIFTS & DEPARTMENTS) */}
+              {empSubTab === 'settings' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                  {/* DEPARTMENTS CARD */}
+                  <div className="glass-panel">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                      <h3 style={{ margin: 0, fontSize: '17px' }}>Departments</h3>
+                      <button onClick={() => setShowCreateDeptModal(true)} className="btn btn-secondary btn-sm">+ Add Dept</button>
+                    </div>
+                    <div className="table-wrapper">
+                      <table className="table">
+                        <thead>
+                          <tr>
+                            <th>Code</th>
+                            <th>Name</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {departments.length === 0 ? (
+                            <tr>
+                              <td colSpan={2} style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>No departments logged.</td>
+                            </tr>
+                          ) : (
+                            departments.map(dept => (
+                              <tr key={dept.id}>
+                                <td><code>{dept.code}</code></td>
+                                <td><strong>{dept.name}</strong></td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* SHIFTS CARD */}
+                  <div className="glass-panel">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                      <h3 style={{ margin: 0, fontSize: '17px' }}>Shifts Calendar</h3>
+                      <button onClick={() => setShowCreateShiftModal(true)} className="btn btn-secondary btn-sm">+ Add Shift</button>
+                    </div>
+                    <div className="table-wrapper">
+                      <table className="table">
+                        <thead>
+                          <tr>
+                            <th>Name</th>
+                            <th>Hours</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {shifts.length === 0 ? (
+                            <tr>
+                              <td colSpan={2} style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>No shift schedules logged.</td>
+                            </tr>
+                          ) : (
+                            shifts.map(sh => (
+                              <tr key={sh.id}>
+                                <td><strong>{sh.name}</strong></td>
+                                <td><code>{sh.start_time.substring(0, 5)} - {sh.end_time.substring(0, 5)}</code></td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </main>
 
@@ -4904,6 +5428,154 @@ function App() {
               <div className="modal-footer">
                 <button type="button" onClick={() => setShowCreateKitchenOrderModal(false)} className="btn btn-secondary">Cancel</button>
                 <button type="submit" className="btn">Send to Kitchen</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* MODAL 17: CREATE EMPLOYEE */}
+      {showCreateEmployeeModal && (
+        <div className="modal-overlay">
+          <div className="glass-panel modal-card" style={{ maxWidth: '650px', width: '90%' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Register Employee Profile</h3>
+              <button onClick={() => setShowCreateEmployeeModal(false)} className="modal-close">×</button>
+            </div>
+            <form onSubmit={handleCreateEmployee}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">First Name</label>
+                  <input type="text" className="form-input" required value={empFirstName} onChange={(e) => setEmpFirstName(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Last Name</label>
+                  <input type="text" className="form-input" required value={empLastName} onChange={(e) => setEmpLastName(e.target.value)} />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">Employee Code</label>
+                  <input type="text" className="form-input" placeholder="e.g. EMP102" required value={empCode} onChange={(e) => setEmpCode(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Status</label>
+                  <select className="select-dropdown" value={empStatus} onChange={(e) => setEmpStatus(e.target.value)}>
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">Email Address</label>
+                  <input type="email" className="form-input" value={empEmail} onChange={(e) => setEmpEmail(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Phone Number</label>
+                  <input type="text" className="form-input" value={empPhone} onChange={(e) => setEmpPhone(e.target.value)} />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">Department Assignment</label>
+                  <select className="select-dropdown" value={empDeptId} onChange={(e) => setEmpDeptId(e.target.value)}>
+                    <option value="">-- Choose Department --</option>
+                    {departments.map(d => (
+                      <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Shift Calendar</label>
+                  <select className="select-dropdown" value={empShiftId} onChange={(e) => setEmpShiftId(e.target.value)}>
+                    <option value="">-- Choose Shift --</option>
+                    {shifts.map(s => (
+                      <option key={s.id} value={s.id}>{s.name} ({s.start_time.substring(0, 5)} - {s.end_time.substring(0, 5)})</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <div className="form-group">
+                  <label className="form-label">Emergency Contact Name</label>
+                  <input type="text" className="form-input" placeholder="Name of relative" value={empEmergencyName} onChange={(e) => setEmpEmergencyName(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Emergency Phone</label>
+                  <input type="text" className="form-input" placeholder="Relative phone number" value={empEmergencyPhone} onChange={(e) => setEmpEmergencyPhone(e.target.value)} />
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '15px' }}>
+                <label className="form-label">Base Salary (INR/Month) - Restricted View</label>
+                <input type="number" step="0.01" placeholder="e.g. 25000.00" className="form-input" value={empSalary} onChange={(e) => setEmpSalary(e.target.value)} />
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" onClick={() => setShowCreateEmployeeModal(false)} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn">Register Profile</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 18: CREATE DEPARTMENT */}
+      {showCreateDeptModal && (
+        <div className="modal-overlay">
+          <div className="glass-panel modal-card" style={{ maxWidth: '450px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Register Department</h3>
+              <button onClick={() => setShowCreateDeptModal(false)} className="modal-close">×</button>
+            </div>
+            <form onSubmit={handleCreateDepartment}>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label">Department Name</label>
+                <input type="text" className="form-input" placeholder="e.g. Food & Beverage" required value={deptName} onChange={(e) => setDeptName(e.target.value)} />
+              </div>
+              <div className="form-group" style={{ marginBottom: '15px' }}>
+                <label className="form-label">Department Code</label>
+                <input type="text" className="form-input" placeholder="e.g. FB" required value={deptCode} onChange={(e) => setDeptCode(e.target.value)} />
+              </div>
+              <div className="modal-footer">
+                <button type="button" onClick={() => setShowCreateDeptModal(false)} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn">Save Department</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 19: CREATE SHIFT */}
+      {showCreateShiftModal && (
+        <div className="modal-overlay">
+          <div className="glass-panel modal-card" style={{ maxWidth: '450px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Register Shift Schedule</h3>
+              <button onClick={() => setShowCreateShiftModal(false)} className="modal-close">×</button>
+            </div>
+            <form onSubmit={handleCreateShift}>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label">Shift Name</label>
+                <input type="text" className="form-input" placeholder="e.g. Morning Shift" required value={shiftName} onChange={(e) => setShiftName(e.target.value)} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
+                <div className="form-group">
+                  <label className="form-label">Start Time</label>
+                  <input type="time" className="form-input" required value={shiftStart} onChange={(e) => setShiftStart(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">End Time</label>
+                  <input type="time" className="form-input" required value={shiftEnd} onChange={(e) => setShiftEnd(e.target.value)} />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" onClick={() => setShowCreateShiftModal(false)} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn">Save Shift</button>
               </div>
             </form>
           </div>
