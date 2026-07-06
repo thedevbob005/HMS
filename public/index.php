@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Slim\Factory\AppFactory;
 use App\Middleware\JsonBodyParserMiddleware;
+use App\Middleware\SecurityHeadersMiddleware;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
@@ -19,6 +20,7 @@ $app = AppFactory::create();
 // Add Routing & Body Parsing Middleware
 $app->addBodyParsingMiddleware();
 $app->add(new JsonBodyParserMiddleware());
+$app->add(new SecurityHeadersMiddleware());
 $app->addRoutingMiddleware();
 
 // Retrieve configuration settings

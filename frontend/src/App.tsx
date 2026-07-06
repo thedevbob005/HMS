@@ -229,6 +229,12 @@ function App() {
   const [shiftEnd, setShiftEnd] = useState('');
   const [empSubTab, setEmpSubTab] = useState<'roster' | 'attendance' | 'settings'>('roster');
 
+  // Phase 10 Reports state
+  const [reportSubTab, setReportSubTab] = useState<'collection' | 'occupancy' | 'gst' | 'revenue'>('collection');
+  const [occupancyReport, setOccupancyReport] = useState<any[]>([]);
+  const [gstReport, setGstReport] = useState<any | null>(null);
+  const [revenueReport, setRevenueReport] = useState<any[]>([]);
+
   // Modals state
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [newRoomStatus, setNewRoomStatus] = useState('');
@@ -370,9 +376,24 @@ function App() {
       if (msgData.success) setMessages(msgData.data);
 
        // Fetch collections report metrics
-      const colRes = await fetch(`/api/hotels/${activeHotelId}/reports/collection?start_date=${colStartDate}&end_date=${colEndDate}`, { headers: getHeaders() });
-      const colData = await colRes.json();
-      if (colData.success) setCollections(colData.data);
+       const colRes = await fetch(`/api/hotels/${activeHotelId}/reports/collection?start_date=${colStartDate}&end_date=${colEndDate}`, { headers: getHeaders() });
+       const colData = await colRes.json();
+       if (colData.success) setCollections(colData.data);
+
+       // Fetch occupancy metrics
+       const occRes = await fetch(`/api/hotels/${activeHotelId}/reports/occupancy?start_date=${colStartDate}&end_date=${colEndDate}`, { headers: getHeaders() });
+       const occData = await occRes.json();
+       if (occData.success) setOccupancyReport(occData.data);
+
+       // Fetch GST tax breakdown
+       const gstReportRes = await fetch(`/api/hotels/${activeHotelId}/reports/gst?start_date=${colStartDate}&end_date=${colEndDate}`, { headers: getHeaders() });
+       const gstReportData = await gstReportRes.json();
+       if (gstReportData.success) setGstReport(gstReportData.data);
+
+       // Fetch Revenue metrics
+       const revRes = await fetch(`/api/hotels/${activeHotelId}/reports/revenue?start_date=${colStartDate}&end_date=${colEndDate}`, { headers: getHeaders() });
+       const revData = await revRes.json();
+       if (revData.success) setRevenueReport(revData.data);
 
       // Fetch housekeeping tasks
       let hkUrl = `/api/hotels/${activeHotelId}/housekeeping/tasks`;
@@ -3099,11 +3120,23 @@ function App() {
             </div>
           )}
 
-          {/* 10. FINANCIAL REPORTS */}
+          {/* 10. FINANCIAL & OPERATIONAL REPORTS */}
           {activeTab === 'reports' && (
             <div className="glass-panel">
-              <h2 className="page-title">Daily Financial Collections Report</h2>
-              <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '20px', alignItems: 'end' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+                <h2 className="page-title" style={{ margin: 0 }}>Hotel Analytics & Reports</h2>
+                
+                {/* Reports Sub tabs */}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={() => setReportSubTab('collection')} className={`btn ${reportSubTab === 'collection' ? '' : 'btn-secondary'}`} style={{ fontSize: '13px', padding: '6px 12px' }}>Collections</button>
+                  <button onClick={() => setReportSubTab('occupancy')} className={`btn ${reportSubTab === 'occupancy' ? '' : 'btn-secondary'}`} style={{ fontSize: '13px', padding: '6px 12px' }}>Occupancy Rates</button>
+                  <button onClick={() => setReportSubTab('gst')} className={`btn ${reportSubTab === 'gst' ? '' : 'btn-secondary'}`} style={{ fontSize: '13px', padding: '6px 12px' }}>GST Tax Ledger</button>
+                  <button onClick={() => setReportSubTab('revenue')} className={`btn ${reportSubTab === 'revenue' ? '' : 'btn-secondary'}`} style={{ fontSize: '13px', padding: '6px 12px' }}>Revenue Centers</button>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '15px', marginBottom: '25px', alignItems: 'end' }}>
                 <div className="form-group">
                   <label className="form-label">Start Date</label>
                   <input type="date" className="form-input" value={colStartDate} onChange={(e) => setColStartDate(e.target.value)} />
@@ -3112,77 +3145,269 @@ function App() {
                   <label className="form-label">End Date</label>
                   <input type="date" className="form-input" value={colEndDate} onChange={(e) => setColEndDate(e.target.value)} />
                 </div>
-                <button onClick={fetchScopedData} className="btn" style={{ height: '40px' }}>Filter Report</button>
+                <button onClick={fetchScopedData} className="btn" style={{ height: '40px' }}>Filter Reports</button>
               </div>
 
-              {/* METRIC CARD OVERVIEW BLOCK */}
-              {(() => {
-                let grandTotal = 0;
-                let txCount = 0;
-                let methodTotals: { [key: string]: number } = {};
-                collections.forEach(day => {
-                  grandTotal += day.day_total;
-                  txCount += day.day_count;
-                  day.methods.forEach((m: any) => {
-                    methodTotals[m.payment_method] = (methodTotals[m.payment_method] || 0) + m.total_amount;
-                  });
-                });
-                return (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '15px', marginBottom: '25px' }}>
-                    <div style={{ background: 'rgba(157, 59, 248, 0.1)', border: '1px solid var(--primary)', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
-                      <span style={{ fontSize: '12px', color: '#a78bfa', textTransform: 'uppercase', fontWeight: 'bold' }}>Total Collections</span>
-                      <h3 style={{ margin: '8px 0 0 0', fontSize: '20px' }}>{grandTotal.toFixed(2)} INR</h3>
-                    </div>
-                    <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
-                      <span style={{ fontSize: '12px', color: '#9ca3af', textTransform: 'uppercase' }}>UPI</span>
-                      <h3 style={{ margin: '8px 0 0 0', fontSize: '20px' }}>{(methodTotals['UPI'] || 0).toFixed(2)}</h3>
-                    </div>
-                    <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
-                      <span style={{ fontSize: '12px', color: '#9ca3af', textTransform: 'uppercase' }}>Cash</span>
-                      <h3 style={{ margin: '8px 0 0 0', fontSize: '20px' }}>{(methodTotals['Cash'] || 0).toFixed(2)}</h3>
-                    </div>
-                    <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
-                      <span style={{ fontSize: '12px', color: '#9ca3af', textTransform: 'uppercase' }}>Card</span>
-                      <h3 style={{ margin: '8px 0 0 0', fontSize: '20px' }}>{(methodTotals['Card'] || 0).toFixed(2)}</h3>
-                    </div>
-                    <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
-                      <span style={{ fontSize: '12px', color: '#9ca3af', textTransform: 'uppercase' }}>Bank</span>
-                      <h3 style={{ margin: '8px 0 0 0', fontSize: '20px' }}>{(methodTotals['Bank'] || methodTotals['Bank Transfer'] || 0).toFixed(2)}</h3>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              <div className="table-wrapper">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Payment Breakdown</th>
-                      <th style={{ textAlign: 'right' }}>Total Collections</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {collections.map((col) => (
-                      <tr key={col.date}>
-                        <td><strong>{col.date}</strong></td>
-                        <td>
-                          <div style={{ display: 'flex', gap: '15px', fontSize: '13px' }}>
-                            {col.methods.map((m: any) => (
-                              <span key={m.payment_method}>
-                                <strong style={{ color: '#a78bfa' }}>{m.payment_method}:</strong> {m.total_amount.toFixed(2)} ({m.transaction_count} tx)
-                              </span>
-                            ))}
+              {/* COLLECTIONS SUBTAB */}
+              {reportSubTab === 'collection' && (
+                <div>
+                  <h3 style={{ fontSize: '16px', marginBottom: '15px' }}>Daily Financial Collections</h3>
+                  {(() => {
+                    let grandTotal = 0;
+                    let methodTotals: { [key: string]: number } = {};
+                    collections.forEach(day => {
+                      grandTotal += day.day_total;
+                      day.methods.forEach((m: any) => {
+                        methodTotals[m.payment_method] = (methodTotals[m.payment_method] || 0) + m.total_amount;
+                      });
+                    });
+                    return (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px', marginBottom: '25px' }}>
+                        <div style={{ background: 'rgba(157, 59, 248, 0.1)', border: '1px solid var(--primary)', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
+                          <span style={{ fontSize: '11px', color: '#a78bfa', textTransform: 'uppercase', fontWeight: 'bold' }}>Total Collections</span>
+                          <h3 style={{ margin: '8px 0 0 0', fontSize: '20px' }}>{grandTotal.toFixed(2)} INR</h3>
+                        </div>
+                        {['UPI', 'Cash', 'Card', 'Bank'].map(method => (
+                          <div key={method} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
+                            <span style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase' }}>{method}</span>
+                            <h3 style={{ margin: '8px 0 0 0', fontSize: '18px' }}>{(methodTotals[method] || 0).toFixed(2)}</h3>
                           </div>
-                        </td>
-                        <td style={{ textAlign: 'right', fontWeight: 'bold', color: 'var(--status-available)' }}>
-                          {col.day_total.toFixed(2)} INR
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
+                  <div className="table-wrapper">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Payment Breakdown</th>
+                          <th style={{ textAlign: 'right' }}>Total Collections</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {collections.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>No collections found.</td>
+                          </tr>
+                        ) : (
+                          collections.map((col) => (
+                            <tr key={col.date}>
+                              <td><strong>{col.date}</strong></td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '15px', fontSize: '13px' }}>
+                                  {col.methods.map((m: any) => (
+                                    <span key={m.payment_method}>
+                                      <strong style={{ color: '#a78bfa' }}>{m.payment_method}:</strong> {m.total_amount.toFixed(2)} ({m.transaction_count} tx)
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                              <td style={{ textAlign: 'right', fontWeight: 'bold', color: 'var(--status-available)' }}>
+                                {col.day_total.toFixed(2)} INR
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* OCCUPANCY SUBTAB */}
+              {reportSubTab === 'occupancy' && (
+                <div>
+                  <h3 style={{ fontSize: '16px', marginBottom: '15px' }}>Room Occupancy Rates</h3>
+                  
+                  {/* Summary card */}
+                  {(() => {
+                    let totalDays = occupancyReport.length;
+                    let avgRate = totalDays > 0 ? occupancyReport.reduce((acc, curr) => acc + curr.occupancy_rate, 0) / totalDays : 0;
+                    return (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '25px' }}>
+                        <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid #10b981', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
+                          <span style={{ fontSize: '11px', color: '#34d399', textTransform: 'uppercase', fontWeight: 'bold' }}>Average Occupancy Rate</span>
+                          <h3 style={{ margin: '8px 0 0 0', fontSize: '22px' }}>{avgRate.toFixed(1)}%</h3>
+                        </div>
+                        <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
+                          <span style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase' }}>Scope Days Analyzed</span>
+                          <h3 style={{ margin: '8px 0 0 0', fontSize: '22px' }}>{totalDays} days</h3>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  <div className="table-wrapper">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Total Room Count</th>
+                          <th>Occupied Room Count</th>
+                          <th style={{ textAlign: 'right' }}>Occupancy Percentage</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {occupancyReport.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>No occupancy records analyzed.</td>
+                          </tr>
+                        ) : (
+                          occupancyReport.map((row) => (
+                            <tr key={row.date}>
+                              <td><strong>{row.date}</strong></td>
+                              <td>{row.total_rooms} rooms</td>
+                              <td>
+                                <span style={{ fontWeight: 'bold', color: row.occupied_rooms > 0 ? 'var(--status-available)' : '#cbd5e1' }}>
+                                  {row.occupied_rooms} rooms
+                                </span>
+                              </td>
+                              <td style={{ textAlign: 'right', fontWeight: 'bold' }}>
+                                <span style={{ color: row.occupancy_rate >= 50 ? 'var(--status-available)' : '#cbd5e1' }}>
+                                  {parseFloat(row.occupancy_rate).toFixed(1)}%
+                                </span>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* GST TAX LEDGER SUBTAB */}
+              {reportSubTab === 'gst' && (
+                <div>
+                  <h3 style={{ fontSize: '16px', marginBottom: '15px' }}>GST Tax Ledger & Settlements</h3>
+                  
+                  {gstReport && gstReport.totals && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '15px', marginBottom: '25px' }}>
+                      <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase' }}>Taxable Sales (Net)</span>
+                        <h3 style={{ margin: '8px 0 0 0', fontSize: '18px' }}>{parseFloat(gstReport.totals.total_taxable).toFixed(2)}</h3>
+                      </div>
+                      <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase' }}>CGST (Central Tax)</span>
+                        <h3 style={{ margin: '8px 0 0 0', fontSize: '18px' }}>{parseFloat(gstReport.totals.total_cgst).toFixed(2)}</h3>
+                      </div>
+                      <div style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase' }}>SGST (State Tax)</span>
+                        <h3 style={{ margin: '8px 0 0 0', fontSize: '18px' }}>{parseFloat(gstReport.totals.total_sgst).toFixed(2)}</h3>
+                      </div>
+                      <div style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3b82f6', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
+                        <span style={{ fontSize: '11px', color: '#60a5fa', textTransform: 'uppercase', fontWeight: 'bold' }}>Total GST Tax Collected</span>
+                        <h3 style={{ margin: '8px 0 0 0', fontSize: '18px' }}>{parseFloat(gstReport.totals.total_tax).toFixed(2)}</h3>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="table-wrapper">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Revenue Center Type</th>
+                          <th>Taxable Revenue</th>
+                          <th>CGST (50%)</th>
+                          <th>SGST (50%)</th>
+                          <th style={{ textAlign: 'right' }}>Total Tax Amt</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {!gstReport || !gstReport.breakdown || gstReport.breakdown.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>No GST calculations for selected period.</td>
+                          </tr>
+                        ) : (
+                          gstReport.breakdown.map((row: any) => (
+                            <tr key={row.item_type}>
+                              <td><strong style={{ textTransform: 'capitalize' }}>{row.item_type.replace('_', ' ')}</strong></td>
+                              <td>{parseFloat(row.taxable_amount).toFixed(2)} INR</td>
+                              <td>{parseFloat(row.cgst).toFixed(2)} INR</td>
+                              <td>{parseFloat(row.sgst).toFixed(2)} INR</td>
+                              <td style={{ textAlign: 'right', fontWeight: 'bold', color: 'var(--status-available)' }}>
+                                {parseFloat(row.total_tax).toFixed(2)} INR
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* REVENUE CENTERS SUBTAB */}
+              {reportSubTab === 'revenue' && (
+                <div>
+                  <h3 style={{ fontSize: '16px', marginBottom: '15px' }}>Revenue Center Performance</h3>
+                  
+                  {/* Summary card */}
+                  {(() => {
+                    let totalRev = revenueReport.reduce((acc, curr) => acc + curr.day_total, 0);
+                    let centersBreakdown: { [key: string]: number } = {};
+                    revenueReport.forEach(day => {
+                      day.centers.forEach((c: any) => {
+                        centersBreakdown[c.item_type] = (centersBreakdown[c.item_type] || 0) + c.amount;
+                      });
+                    });
+
+                    return (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '25px' }}>
+                        <div style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3b82f6', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
+                          <span style={{ fontSize: '11px', color: '#60a5fa', textTransform: 'uppercase', fontWeight: 'bold' }}>Total Gross Revenue</span>
+                          <h3 style={{ margin: '8px 0 0 0', fontSize: '20px' }}>{totalRev.toFixed(2)} INR</h3>
+                        </div>
+                        {Object.keys(centersBreakdown).map(center => (
+                          <div key={center} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '15px', borderRadius: '8px', textAlign: 'center' }}>
+                            <span style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'capitalize' }}>{center.replace('_', ' ')}</span>
+                            <h3 style={{ margin: '8px 0 0 0', fontSize: '18px' }}>{centersBreakdown[center].toFixed(2)}</h3>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
+                  <div className="table-wrapper">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Revenue Centers Breakdown</th>
+                          <th style={{ textAlign: 'right' }}>Total Revenue</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {revenueReport.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>No revenue records compiled.</td>
+                          </tr>
+                        ) : (
+                          revenueReport.map((day) => (
+                            <tr key={day.date}>
+                              <td><strong>{day.date}</strong></td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '15px', fontSize: '13px' }}>
+                                  {day.centers.map((c: any) => (
+                                    <span key={c.item_type}>
+                                      <strong style={{ textTransform: 'capitalize', color: '#60a5fa' }}>{c.item_type.replace('_', ' ')}:</strong> {c.amount.toFixed(2)}
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                              <td style={{ textAlign: 'right', fontWeight: 'bold', color: 'var(--status-available)' }}>
+                                {day.day_total.toFixed(2)} INR
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

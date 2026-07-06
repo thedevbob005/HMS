@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Services\ReportService;
 use App\Support\ApiResponse;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -14,10 +15,12 @@ use Exception;
 
 class ReportController
 {
+    private ReportService $reportService;
     private PDO $pdo;
 
-    public function __construct(PDO $pdo)
+    public function __construct(ReportService $reportService, PDO $pdo)
     {
+        $this->reportService = $reportService;
         $this->pdo = $pdo;
     }
 
@@ -40,11 +43,8 @@ class ReportController
         }
     }
 
-    public function getCollectionReport(Request $request, Response $response): Response
+    private function getCommonParams(Request $request): array
     {
-        $currentUser = $request->getAttribute('user');
-        $this->checkPermission((int)$currentUser['user_id'], 'reports.view_financial', $request);
-
         $routeContext = RouteContext::fromRequest($request);
         $route = $routeContext->getRoute();
         $hotelId = $route ? (int)$route->getArgument('hotelId') : 0;
@@ -53,49 +53,66 @@ class ReportController
         $startDate = $queryParams['start_date'] ?? date('Y-m-d', strtotime('-7 days'));
         $endDate = $queryParams['end_date'] ?? date('Y-m-d');
 
-        // Fetch daily collections grouped by date and payment method
-        $stmt = $this->pdo->prepare('
-            SELECT 
-                DATE(created_at) as collection_date,
-                payment_method,
-                SUM(amount) as total_amount,
-                COUNT(*) as transaction_count
-            FROM payments
-            WHERE hotel_id = :hotelId
-              AND DATE(created_at) >= :startDate
-              AND DATE(created_at) <= :endDate
-            GROUP BY DATE(created_at), payment_method
-            ORDER BY collection_date DESC, payment_method ASC
-        ');
-        $stmt->execute([
-            ':hotelId' => $hotelId,
-            ':startDate' => $startDate,
-            ':endDate' => $endDate
-        ]);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return [$hotelId, $startDate, $endDate];
+    }
 
-        // Group rows by date for a cleaner UI layout representation
-        $grouped = [];
-        foreach ($rows as $row) {
-            $date = $row['collection_date'];
-            if (!isset($grouped[$date])) {
-                $grouped[$date] = [
-                    'date' => $date,
-                    'methods' => [],
-                    'day_total' => 0.00,
-                    'day_count' => 0
-                ];
-            }
-            $grouped[$date]['methods'][] = [
-                'payment_method' => $row['payment_method'],
-                'total_amount' => (float)$row['total_amount'],
-                'transaction_count' => (int)$row['transaction_count']
-            ];
-            $grouped[$date]['day_total'] += (float)$row['total_amount'];
-            $grouped[$date]['day_count'] += (int)$row['transaction_count'];
+    public function getCollectionReport(Request $request, Response $response): Response
+    {
+        $currentUser = $request->getAttribute('user');
+        $this->checkPermission((int)$currentUser['user_id'], 'reports.view_financial', $request);
+
+        list($hotelId, $startDate, $endDate) = $this->getCommonParams($request);
+
+        try {
+            $report = $this->reportService->getCollectionReport($hotelId, $startDate, $endDate);
+            return ApiResponse::success($report, 'Daily collections report retrieved successfully.');
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 400);
         }
+    }
 
-        // Return list of day-by-day collections
-        return ApiResponse::success(array_values($grouped), 'Daily collections report retrieved successfully.');
+    public function getOccupancyReport(Request $request, Response $response): Response
+    {
+        $currentUser = $request->getAttribute('user');
+        $this->checkPermission((int)$currentUser['user_id'], 'reports.view_financial', $request);
+
+        list($hotelId, $startDate, $endDate) = $this->getCommonParams($request);
+
+        try {
+            $report = $this->reportService->getOccupancyReport($hotelId, $startDate, $endDate);
+            return ApiResponse::success($report, 'Occupancy report compiled successfully.');
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 400);
+        }
+    }
+
+    public function getGSTReport(Request $request, Response $response): Response
+    {
+        $currentUser = $request->getAttribute('user');
+        $this->checkPermission((int)$currentUser['user_id'], 'reports.view_financial', $request);
+
+        list($hotelId, $startDate, $endDate) = $this->getCommonParams($request);
+
+        try {
+            $report = $this->reportService->getGSTReport($hotelId, $startDate, $endDate);
+            return ApiResponse::success($report, 'GST tax ledger generated successfully.');
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 400);
+        }
+    }
+
+    public function getRevenueReport(Request $request, Response $response): Response
+    {
+        $currentUser = $request->getAttribute('user');
+        $this->checkPermission((int)$currentUser['user_id'], 'reports.view_financial', $request);
+
+        list($hotelId, $startDate, $endDate) = $this->getCommonParams($request);
+
+        try {
+            $report = $this->reportService->getRevenueReport($hotelId, $startDate, $endDate);
+            return ApiResponse::success($report, 'Revenue center distribution loaded successfully.');
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 400);
+        }
     }
 }

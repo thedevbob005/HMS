@@ -98,6 +98,9 @@ return function (App $app) {
 
         // Reports
         $group->get('/reports/collection', ReportController::class . ':getCollectionReport');
+        $group->get('/reports/occupancy', ReportController::class . ':getOccupancyReport');
+        $group->get('/reports/gst', ReportController::class . ':getGSTReport');
+        $group->get('/reports/revenue', ReportController::class . ':getRevenueReport');
 
         // Message Queue / Logs
         $group->get('/message-queue', InvoiceController::class . ':listMessages');

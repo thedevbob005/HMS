@@ -135,7 +135,7 @@ This document tracks the functional development of the HMS (Hospitality Manageme
   - [x] Attendance roster tracking daily status (Present, Absent, Leave, Late) and inline clock toggles
   - [x] Restricted salary details block showing pay fields to authorized staff only
 
-### [ ] Phase 10: Reporting and Release Hardening
-- [ ] Daily collection, occupancy, GST, and revenue reports
-- [ ] Progressive Web App (PWA) polish
-- [ ] System hardening and backup scripting
+### [x] Phase 10: Reporting and Release Hardening
+- [x] Daily collection, occupancy, GST, and revenue reports
+- [x] Progressive Web App (PWA) polish
+- [x] System hardening (security headers and locked directory indexes) & backup configuration (managed by hosting provider as requested)
