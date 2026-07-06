@@ -111,9 +111,17 @@ This document tracks the functional development of the HMS (Hospitality Manageme
   - [x] Purchase orders planner with item additions and manager approval toggles
   - [x] Goods Receipt logger linked to approved POs with batch/expiry capture fields
 
-### [ ] Phase 8: Kitchen and Recipe Costing
-- [ ] Room service kitchen orders
-- [ ] Recipe costing sheets and auto inventory deduction
+### [x] Phase 8: Kitchen and Recipe Costing
+- [x] Database Schema & Migrations: create tables for `kitchen_items`, `recipes`, `recipe_items`, `kitchen_orders`, and `kitchen_order_items`
+- [x] Business Services:
+  - [x] Implement `KitchenService.php` to manage menu items, recipes, costing sheets, and order status transitions
+  - [x] Implement automated ingredient inventory deduction through the Stock Ledger when kitchen orders are served
+  - [x] Hook folio charge insertion to automatically post room service expenses to the guest stay folio (or check meal plan inclusion exclusions)
+- [x] Controller & Routing Layer: endpoints for kitchen items, recipes, order placers, served state updates, and costing sheet metrics
+- [x] Frontend React UI tab:
+  - [x] Menu items directory and Recipe ingredient builder panels
+  - [x] Room service active orders tracker with quick-status (pending, preparing, served, cancelled) selectors
+  - [x] Recipe Costing & Margin Sheet showing ingredient costs and gross profit percentage valuations
 
 ### [ ] Phase 9: Employees
 - [ ] Staff profile records, department routing, and shift schedules

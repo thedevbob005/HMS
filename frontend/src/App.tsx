@@ -57,7 +57,7 @@ function App() {
   const [loginPassword, setLoginPassword] = useState('');
 
   // App Tabs
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'hotels' | 'staff' | 'room-config' | 'rooms' | 'guests' | 'reservations' | 'stays' | 'invoices' | 'reports' | 'notifications' | 'housekeeping' | 'inventory'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'hotels' | 'staff' | 'room-config' | 'rooms' | 'guests' | 'reservations' | 'stays' | 'invoices' | 'reports' | 'notifications' | 'housekeeping' | 'inventory' | 'kitchen'>('dashboard');
 
   // Loaded DB data
   const [hotels, setHotels] = useState<Hotel[]>([]);
@@ -182,6 +182,25 @@ function App() {
   const [newPoNotes, setNewPoNotes] = useState('');
   const [newPoItems, setNewPoItems] = useState<{ inventory_item_id: string, quantity: string, unit_price: string }[]>([{ inventory_item_id: '', quantity: '', unit_price: '' }]);
   const [invSubTab, setInvSubTab] = useState<'stock' | 'vendors' | 'po' | 'grn'>('stock');
+
+  // Phase 8 State
+  const [kitchenItems, setKitchenItems] = useState<any[]>([]);
+  const [kitchenOrders, setKitchenOrders] = useState<any[]>([]);
+  const [kitchenCostingSheet, setKitchenCostingSheet] = useState<any[]>([]);
+  const [selectedKItem, setSelectedKItem] = useState<any | null>(null);
+  const [showRecipeModal, setShowRecipeModal] = useState(false);
+  const [recipeIngredients, setRecipeIngredients] = useState<{ inventory_item_id: string, quantity: string }[]>([{ inventory_item_id: '', quantity: '' }]);
+  const [recipeInstructions, setRecipeInstructions] = useState('');
+  const [showCreateMenuItemModal, setShowCreateMenuItemModal] = useState(false);
+  const [showCreateKitchenOrderModal, setShowCreateKitchenOrderModal] = useState(false);
+  const [newMenuItemName, setNewMenuItemName] = useState('');
+  const [newMenuItemDesc, setNewMenuItemDesc] = useState('');
+  const [newMenuItemPrice, setNewMenuItemPrice] = useState('');
+  const [newKoStayId, setNewKoStayId] = useState('');
+  const [newKoNotes, setNewKoNotes] = useState('');
+  const [newKoMealIncluded, setNewKoMealIncluded] = useState(false);
+  const [newKoItems, setNewKoItems] = useState<{ kitchen_item_id: string, quantity: string }[]>([{ kitchen_item_id: '', quantity: '1' }]);
+  const [kitchenSubTab, setKitchenSubTab] = useState<'orders' | 'menu' | 'costing'>('orders');
 
   // Modals state
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
@@ -354,6 +373,19 @@ function App() {
       const grnRes = await fetch(`/api/hotels/${activeHotelId}/purchases/receipts`, { headers: getHeaders() });
       const grnData = await grnRes.json();
       if (grnData.success) setGoodsReceipts(grnData.data);
+
+      // Fetch kitchen details
+      const kRes = await fetch(`/api/hotels/${activeHotelId}/kitchen/menu-items`, { headers: getHeaders() });
+      const kData = await kRes.json();
+      if (kData.success) setKitchenItems(kData.data);
+
+      const ordRes = await fetch(`/api/hotels/${activeHotelId}/kitchen/orders`, { headers: getHeaders() });
+      const ordData = await ordRes.json();
+      if (ordData.success) setKitchenOrders(ordData.data);
+
+      const costRes = await fetch(`/api/hotels/${activeHotelId}/kitchen/costing-sheet`, { headers: getHeaders() });
+      const costData = await costRes.json();
+      if (costData.success) setKitchenCostingSheet(costData.data);
 
     } catch (e) {
       showFeedback('danger', 'Failed to retrieve hotel-specific metadata.');
@@ -1141,6 +1173,110 @@ function App() {
     }
   };
 
+  // Phase 8 Action Handlers
+  const handleCreateMenuItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/kitchen/menu-items`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          name: newMenuItemName,
+          description: newMenuItemDesc,
+          price: parseFloat(newMenuItemPrice)
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showFeedback('success', data.message);
+        setNewMenuItemName('');
+        setNewMenuItemDesc('');
+        setNewMenuItemPrice('');
+        setShowCreateMenuItemModal(false);
+        fetchScopedData();
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to save menu item.');
+    }
+  };
+
+  const handleConfigureRecipeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedKItem) return;
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/kitchen/menu-items/${selectedKItem.id}/recipe`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          instructions: recipeInstructions,
+          ingredients: recipeIngredients
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showFeedback('success', data.message);
+        setShowRecipeModal(false);
+        setSelectedKItem(null);
+        fetchScopedData();
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to save recipe.');
+    }
+  };
+
+  const handleCreateKitchenOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/kitchen/orders`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          stay_id: parseInt(newKoStayId),
+          notes: newKoNotes,
+          is_meal_plan_included: newKoMealIncluded,
+          items: newKoItems
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showFeedback('success', data.message);
+        setNewKoStayId('');
+        setNewKoNotes('');
+        setNewKoMealIncluded(false);
+        setNewKoItems([{ kitchen_item_id: '', quantity: '1' }]);
+        setShowCreateKitchenOrderModal(false);
+        fetchScopedData();
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to send kitchen order.');
+    }
+  };
+
+  const handleUpdateKitchenOrderStatus = async (orderId: number, status: string) => {
+    try {
+      const res = await fetch(`/api/hotels/${activeHotelId}/kitchen/orders/${orderId}/status`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ status })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showFeedback('success', data.message);
+        fetchScopedData();
+      } else {
+        showFeedback('danger', data.message);
+      }
+    } catch (e) {
+      showFeedback('danger', 'Failed to update order status.');
+    }
+  };
+
   // Create Reservation
   const handleCreateReservation = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1544,6 +1680,16 @@ function App() {
               className={`nav-button ${activeTab === 'inventory' ? 'active' : ''}`}
             >
               Inventory & Purchases
+            </button>
+          </li>
+          <li className="nav-item">
+            <button
+              onClick={() => {
+                setActiveTab('kitchen');
+              }}
+              className={`nav-button ${activeTab === 'kitchen' ? 'active' : ''}`}
+            >
+              Kitchen Room Service
             </button>
           </li>
         </ul>
@@ -3369,6 +3515,213 @@ function App() {
               )}
             </div>
           )}
+
+          {/* 14. KITCHEN ROOM SERVICE & RECIPES DASHBOARD */}
+          {activeTab === 'kitchen' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 className="page-title" style={{ margin: 0 }}>Kitchen Room Service & Costing</h2>
+                
+                {/* Sub tabs */}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={() => setKitchenSubTab('orders')} className={`btn ${kitchenSubTab === 'orders' ? '' : 'btn-secondary'}`} style={{ fontSize: '13px', padding: '6px 12px' }}>Room Service Orders</button>
+                  <button onClick={() => setKitchenSubTab('menu')} className={`btn ${kitchenSubTab === 'menu' ? '' : 'btn-secondary'}`} style={{ fontSize: '13px', padding: '6px 12px' }}>Menu & Recipes</button>
+                  <button onClick={() => setKitchenSubTab('costing')} className={`btn ${kitchenSubTab === 'costing' ? '' : 'btn-secondary'}`} style={{ fontSize: '13px', padding: '6px 12px' }}>Costing Sheets</button>
+                </div>
+              </div>
+
+              {/* ORDERS TRACKER */}
+              {kitchenSubTab === 'orders' && (
+                <div className="glass-panel">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <h3 style={{ margin: 0, fontSize: '18px' }}>Active Room Service Orders</h3>
+                    <button onClick={() => setShowCreateKitchenOrderModal(true)} className="btn btn-sm">Place Kitchen Order</button>
+                  </div>
+                  <div className="table-wrapper">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Order #</th>
+                          <th>Room</th>
+                          <th>Stay ID</th>
+                          <th>Included Meal Plan</th>
+                          <th>Total Amount</th>
+                          <th>Status</th>
+                          <th>Notes</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {kitchenOrders.length === 0 ? (
+                          <tr>
+                            <td colSpan={8} style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>No room service orders found.</td>
+                          </tr>
+                        ) : (
+                          kitchenOrders.map(o => (
+                            <tr key={o.id}>
+                              <td><code>{o.order_number}</code></td>
+                              <td><strong>{o.room_number}</strong></td>
+                              <td>#{o.stay_id}</td>
+                              <td>{o.is_meal_plan_included ? 'Yes (Included)' : 'No (Chargeable)'}</td>
+                              <td>{parseFloat(o.total_amount).toFixed(2)} INR</td>
+                              <td>
+                                <span className="room-status-badge" style={{ 
+                                  margin: 0, 
+                                  background: o.status === 'served' ? 'var(--status-available)' :
+                                              o.status === 'preparing' ? '#d97706' :
+                                              o.status === 'cancelled' ? 'var(--status-occupied)' : 'var(--primary)' 
+                                }}>
+                                  {o.status}
+                                </span>
+                              </td>
+                              <td style={{ fontSize: '12px' }}>{o.notes || '-'}</td>
+                              <td>
+                                <div style={{ display: 'flex', gap: '5px' }}>
+                                  {o.status === 'pending' && (
+                                    <button onClick={() => handleUpdateKitchenOrderStatus(o.id, 'preparing')} className="btn btn-sm" style={{ padding: '4px 8px', fontSize: '11px', background: '#d97706', color: '#fff' }}>Prepare</button>
+                                  )}
+                                  {o.status === 'preparing' && (
+                                    <button onClick={() => handleUpdateKitchenOrderStatus(o.id, 'served')} className="btn btn-sm" style={{ padding: '4px 8px', fontSize: '11px', background: 'var(--status-available)', color: '#fff' }}>Serve (Complete)</button>
+                                  )}
+                                  {(o.status === 'pending' || o.status === 'preparing') && (
+                                    <button onClick={() => handleUpdateKitchenOrderStatus(o.id, 'cancelled')} className="btn btn-secondary btn-sm" style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--status-occupied)' }}>Cancel</button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* MENU & RECIPES */}
+              {kitchenSubTab === 'menu' && (
+                <div className="glass-panel">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                    <h3 style={{ margin: 0, fontSize: '18px' }}>Kitchen Menu Items</h3>
+                    <button onClick={() => setShowCreateMenuItemModal(true)} className="btn btn-sm">Add Menu Item</button>
+                  </div>
+                  <div className="table-wrapper">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Item Name</th>
+                          <th>Description</th>
+                          <th>Price</th>
+                          <th>Status</th>
+                          <th>Recipe Builder</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {kitchenItems.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>No menu items found.</td>
+                          </tr>
+                        ) : (
+                          kitchenItems.map(item => (
+                            <tr key={item.id}>
+                              <td><strong>{item.name}</strong></td>
+                              <td style={{ fontSize: '12px' }}>{item.description || '-'}</td>
+                              <td>{parseFloat(item.price).toFixed(2)} INR</td>
+                              <td>
+                                <span style={{ 
+                                  padding: '2px 8px', 
+                                  borderRadius: '12px', 
+                                  fontSize: '11px', 
+                                  background: item.is_active ? 'var(--status-available)' : 'var(--status-occupied)', 
+                                  color: '#fff', 
+                                  fontWeight: 'bold' 
+                                }}>
+                                  {item.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                              </td>
+                              <td>
+                                <button onClick={async () => {
+                                  // Fetch recipe details
+                                  try {
+                                    const r = await fetch(`/api/hotels/${activeHotelId}/kitchen/menu-items/${item.id}/recipe`, { headers: getHeaders() });
+                                    const d = await r.json();
+                                    setSelectedKItem(item);
+                                    if (d.success && d.data) {
+                                      setRecipeInstructions(d.data.instructions || '');
+                                      setRecipeIngredients(d.data.items.map((ri: any) => ({
+                                        inventory_item_id: ri.inventory_item_id,
+                                        quantity: ri.quantity
+                                      })));
+                                    } else {
+                                      setRecipeInstructions('');
+                                      setRecipeIngredients([{ inventory_item_id: '', quantity: '' }]);
+                                    }
+                                    setShowRecipeModal(true);
+                                  } catch (e) {
+                                    showFeedback('danger', 'Failed to load recipe.');
+                                  }
+                                }} className="btn btn-secondary btn-sm" style={{ padding: '4px 8px', fontSize: '11px' }}>Configure Recipe</button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* COSTING SHEETS */}
+              {kitchenSubTab === 'costing' && (
+                <div className="glass-panel">
+                  <h3 style={{ marginBottom: '15px', fontSize: '18px' }}>Recipe Costing Sheets & GP Margins</h3>
+                  <div className="table-wrapper">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Menu Item</th>
+                          <th>Price</th>
+                          <th>Ingredient Cost (Avg Unit Costs)</th>
+                          <th>Gross Profit</th>
+                          <th>Profit Margin %</th>
+                          <th>Has Recipe</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {kitchenCostingSheet.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} style={{ textAlign: 'center', color: '#9ca3af', fontStyle: 'italic' }}>No costing records compiled.</td>
+                          </tr>
+                        ) : (
+                          kitchenCostingSheet.map(row => (
+                            <tr key={row.item_id}>
+                              <td><strong>{row.name}</strong></td>
+                              <td>{parseFloat(row.price).toFixed(2)} INR</td>
+                              <td>{parseFloat(row.recipe_cost).toFixed(2)} INR</td>
+                              <td style={{ color: row.gross_profit >= 0 ? 'var(--status-available)' : 'var(--status-occupied)', fontWeight: 'bold' }}>
+                                {parseFloat(row.gross_profit).toFixed(2)} INR
+                              </td>
+                              <td>
+                                <strong style={{ color: row.margin_percentage >= 35 ? 'var(--status-available)' : '#cbd5e1' }}>
+                                  {parseFloat(row.margin_percentage).toFixed(1)}%
+                                </strong>
+                              </td>
+                              <td>
+                                {row.has_recipe ? (
+                                  <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '11px', background: 'var(--status-available)', color: '#fff', fontWeight: 'bold' }}>Configured</span>
+                                ) : (
+                                  <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '11px', background: '#d97706', color: '#fff', fontWeight: 'bold' }}>Missing Recipe</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </main>
 
@@ -4336,6 +4689,223 @@ function App() {
               <button onClick={() => setSelectedUserForAccess(null)} className="btn btn-secondary">Cancel</button>
               <button onClick={handleSaveAccess} className="btn">Save Access Controls</button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* MODAL 14: KITCHEN MENU ITEM CREATE */}
+      {showCreateMenuItemModal && (
+        <div className="modal-overlay">
+          <div className="glass-panel modal-card" style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Register Kitchen Menu Item</h3>
+              <button onClick={() => setShowCreateMenuItemModal(false)} className="modal-close">×</button>
+            </div>
+            <form onSubmit={handleCreateMenuItem}>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label">Dish Name</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Masala Chai or Veg Club Sandwich"
+                  value={newMenuItemName}
+                  onChange={(e) => setNewMenuItemName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label">Description / Remarks</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Served with French fries & ketchup"
+                  value={newMenuItemDesc}
+                  onChange={(e) => setNewMenuItemDesc(e.target.value)}
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: '15px' }}>
+                <label className="form-label">Selling Price to Guest (INR)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="form-input"
+                  value={newMenuItemPrice}
+                  onChange={(e) => setNewMenuItemPrice(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="modal-footer">
+                <button type="button" onClick={() => setShowCreateMenuItemModal(false)} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn">Save Menu Item</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 15: CONFIGURE RECIPE */}
+      {showRecipeModal && selectedKItem && (
+        <div className="modal-overlay">
+          <div className="glass-panel modal-card" style={{ maxWidth: '650px', width: '90%' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Configure Recipe & Costing - {selectedKItem.name}</h3>
+              <button onClick={() => {
+                setShowRecipeModal(false);
+                setSelectedKItem(null);
+              }} className="modal-close">×</button>
+            </div>
+            <form onSubmit={handleConfigureRecipeSubmit}>
+              <div style={{ marginBottom: '15px' }}>
+                <label className="form-label">Required Ingredient Quantities (Per Serving)</label>
+                {recipeIngredients.map((item, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+                    <select
+                      className="select-dropdown"
+                      value={item.inventory_item_id}
+                      onChange={(e) => {
+                        const updated = [...recipeIngredients];
+                        updated[idx].inventory_item_id = e.target.value;
+                        setRecipeIngredients(updated);
+                      }}
+                      required
+                      style={{ flex: 2 }}
+                    >
+                      <option value="">-- Select Inventory Ingredient --</option>
+                      {inventoryItems.map(ii => (
+                        <option key={ii.id} value={ii.id}>{ii.name} ({ii.sku})</option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      placeholder="Qty Required"
+                      className="form-input"
+                      required
+                      value={item.quantity}
+                      onChange={(e) => {
+                        const updated = [...recipeIngredients];
+                        updated[idx].quantity = e.target.value;
+                        setRecipeIngredients(updated);
+                      }}
+                      style={{ flex: 1, minWidth: '100px' }}
+                    />
+                    {recipeIngredients.length > 1 && (
+                      <button type="button" onClick={() => setRecipeIngredients(recipeIngredients.filter((_, i) => i !== idx))} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '0 8px', borderRadius: '4px', cursor: 'pointer', height: '36px' }}>×</button>
+                    )}
+                  </div>
+                ))}
+                <button type="button" onClick={() => setRecipeIngredients([...recipeIngredients, { inventory_item_id: '', quantity: '' }])} className="btn btn-secondary btn-sm" style={{ marginTop: '5px' }}>+ Add Ingredient</button>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '15px' }}>
+                <label className="form-label">Cooking Instructions / Preparation Notes</label>
+                <textarea
+                  className="form-input"
+                  style={{ minHeight: '80px', fontFamily: 'inherit' }}
+                  placeholder="e.g. Boil tea leaves with milk for 5 mins, add cardamom."
+                  value={recipeInstructions}
+                  onChange={(e) => setRecipeInstructions(e.target.value)}
+                />
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" onClick={() => {
+                  setShowRecipeModal(false);
+                  setSelectedKItem(null);
+                }} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn">Save Recipe & Costing Sheet</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 16: PLACE KITCHEN ORDER */}
+      {showCreateKitchenOrderModal && (
+        <div className="modal-overlay">
+          <div className="glass-panel modal-card" style={{ maxWidth: '650px', width: '90%' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Place Room Service Kitchen Order</h3>
+              <button onClick={() => setShowCreateKitchenOrderModal(false)} className="modal-close">×</button>
+            </div>
+            <form onSubmit={handleCreateKitchenOrder}>
+              <div className="form-group" style={{ marginBottom: '12px' }}>
+                <label className="form-label">Select Active Guest Stay / Room</label>
+                <select className="select-dropdown" value={newKoStayId} onChange={(e) => setNewKoStayId(e.target.value)} required>
+                  <option value="">-- Select Active Stay --</option>
+                  {stays.filter(s => s.status === 'Active').map(s => (
+                    <option key={s.id} value={s.id}>Stay #{s.id} - Room {s.rooms?.[0]?.room_number} ({s.booker_first_name} {s.booker_last_name})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={newKoMealIncluded}
+                    onChange={(e) => setNewKoMealIncluded(e.target.checked)}
+                  />
+                  Covered under Meal Plan (Include in CP/MAP/AP, no extra charge on checkout folio)
+                </label>
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label className="form-label">Menu Items Selection</label>
+                {newKoItems.map((item, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+                    <select
+                      className="select-dropdown"
+                      value={item.kitchen_item_id}
+                      onChange={(e) => {
+                        const updated = [...newKoItems];
+                        updated[idx].kitchen_item_id = e.target.value;
+                        setNewKoItems(updated);
+                      }}
+                      required
+                      style={{ flex: 2 }}
+                    >
+                      <option value="">-- Choose Menu Item --</option>
+                      {kitchenItems.map(ki => (
+                        <option key={ki.id} value={ki.id}>{ki.name} ({parseFloat(ki.price).toFixed(2)} INR)</option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      placeholder="Qty"
+                      className="form-input"
+                      required
+                      value={item.quantity}
+                      onChange={(e) => {
+                        const updated = [...newKoItems];
+                        updated[idx].quantity = e.target.value;
+                        setNewKoItems(updated);
+                      }}
+                      style={{ flex: 1, minWidth: '80px' }}
+                    />
+                    {newKoItems.length > 1 && (
+                      <button type="button" onClick={() => setNewKoItems(newKoItems.filter((_, i) => i !== idx))} style={{ background: '#ef4444', color: '#fff', border: 'none', padding: '0 8px', borderRadius: '4px', cursor: 'pointer', height: '36px' }}>×</button>
+                    )}
+                  </div>
+                ))}
+                <button type="button" onClick={() => setNewKoItems([...newKoItems, { kitchen_item_id: '', quantity: '1' }])} className="btn btn-secondary btn-sm" style={{ marginTop: '5px' }}>+ Add Item</button>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: '15px' }}>
+                <label className="form-label">Preparation Notes / Special Instructions</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="e.g. Make it extra spicy, serve without onions"
+                  value={newKoNotes}
+                  onChange={(e) => setNewKoNotes(e.target.value)}
+                />
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" onClick={() => setShowCreateKitchenOrderModal(false)} className="btn btn-secondary">Cancel</button>
+                <button type="submit" className="btn">Send to Kitchen</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

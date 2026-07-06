@@ -20,6 +20,7 @@ use App\Controllers\AadhaarVerificationController;
 use App\Controllers\HousekeepingController;
 use App\Controllers\InventoryController;
 use App\Controllers\PurchaseController;
+use App\Controllers\KitchenController;
 
 return function (App $app) {
     // Health Check Endpoint
@@ -122,6 +123,16 @@ return function (App $app) {
         $group->post('/purchases/orders/{poId}/receive', PurchaseController::class . ':receiveOrder');
         $group->get('/purchases/receipts', PurchaseController::class . ':listReceipts');
         $group->get('/purchases/receipts/{grnId}', PurchaseController::class . ':getReceipt');
+
+        // Kitchen
+        $group->get('/kitchen/menu-items', KitchenController::class . ':listMenuItems');
+        $group->post('/kitchen/menu-items', KitchenController::class . ':createMenuItem');
+        $group->get('/kitchen/menu-items/{itemId}/recipe', KitchenController::class . ':getRecipe');
+        $group->post('/kitchen/menu-items/{itemId}/recipe', KitchenController::class . ':saveRecipe');
+        $group->get('/kitchen/costing-sheet', KitchenController::class . ':getCostingSheet');
+        $group->get('/kitchen/orders', KitchenController::class . ':listOrders');
+        $group->post('/kitchen/orders', KitchenController::class . ':createOrder');
+        $group->post('/kitchen/orders/{orderId}/status', KitchenController::class . ':updateStatus');
     })
     ->add(HotelScopingMiddleware::class)
     ->add(AuthenticationMiddleware::class);
